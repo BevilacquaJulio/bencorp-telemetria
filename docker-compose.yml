@@ -1,0 +1,30 @@
+# PAD — Pronto Atendimento Digital
+#
+# Nesta etapa sobe apenas o banco. Os serviços api, web e livekit entram
+# quando existirem Dockerfiles, para que `docker compose up` nunca fique
+# quebrado no meio do caminho.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pad-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # Exposto para que o Prisma rode da máquina local durante o desenvolvimento.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Sem isso a API sobe antes do banco aceitar conexão e falha na migration.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  pgdata:
