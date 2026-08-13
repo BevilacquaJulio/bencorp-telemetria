@@ -18,6 +18,21 @@ _notas/
 # --- Dependências ------------------------------------------------------------
 node_modules/
 
+# --- Client gerado pelo Prisma 7 ---------------------------------------------
+# O generator `prisma-client` escreve fora de node_modules. Recriado por
+# `prisma generate` no build.
+api/generated/
+
+# --- Skills de agente empacotadas pelo Prisma CLI ----------------------------
+# O `prisma init` do Prisma 7 despeja ~200 arquivos de documentação para
+# Claude, Cursor e Windsurf dentro de api/. São arquivos do fornecedor, não do
+# projeto. As regras do projeto ficam em .cursor/rules na raiz, essas sim
+# versionadas.
+api/.agents/
+api/.claude/
+api/.windsurf/
+api/skills-lock.json
+
 # --- Build -------------------------------------------------------------------
 dist/
 dist-ssr/
