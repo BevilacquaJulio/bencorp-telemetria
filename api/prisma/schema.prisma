@@ -8,8 +8,13 @@
 // mora em prisma.config.ts, não aqui.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  // O client gerado é ESM por padrão (usa import.meta.url internamente).
+  // O resto do projeto (Nest, ts-node, Jest) roda em CommonJS — sem esta
+  // linha, "prisma generate" produz um client que o require() do Node
+  // não carrega (erro em runtime, não em build). Ver .cursor/rules/10-banco.mdc.
+  moduleFormat = "cjs"
 }
 
 datasource db {
