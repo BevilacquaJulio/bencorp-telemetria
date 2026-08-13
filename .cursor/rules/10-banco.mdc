@@ -24,6 +24,8 @@ O projeto usa **Prisma 7.9**. Não vale conhecimento de Prisma 5/6 aqui.
    import { PrismaClient, Papel, StatusAtendimento } from '../../generated/prisma/client';
    ```
 
+   Por padrão esse client gerado é **ESM puro** (usa `import.meta.url` internamente). O resto do projeto — Nest, ts-node, Jest — é CommonJS, e `require()` não carrega um arquivo assim: quebra em runtime com `ReferenceError: exports is not defined in ES module scope`, não em build (confirmado rodando `ts-node` contra o client gerado sem essa flag). Por isso o `generator client` em `schema.prisma` tem `moduleFormat = "cjs"`. Se essa linha sumir numa regeneração, o erro volta — a causa não é o import, é o generator emitindo o formato errado pra este projeto.
+
 3. **A URL do banco mora em `prisma.config.ts`**, não no bloco `datasource` do schema. O `datasource` só declara o provider.
 
 4. **`generated/` fica fora de `node_modules`** e é ignorado pelo Git. `prisma generate` precisa rodar no build do Docker.
@@ -122,4 +124,6 @@ A auditoria fica **fora** da transação de negócio, deliberadamente: um rollba
 
 `prisma/seed.ts` cria: 1 ADMIN, 2 ENFERMEIRO, 2 MEDICO, ~10 pacientes, ~15 atendimentos distribuídos entre os quatro status e entre hoje / ontem / semana passada — os filtros da fila precisam ter o que filtrar. Senhas em texto no README, hash no banco.
 
-Roda automaticamente no boot do container da API.
+Roda automaticamente no boot do container da API — por isso todo `create` é na verdade um `upsert` com `update: {}` e id fixo (Atendimento não tem chave de negócio única pra upsertar). Reiniciar o container não pode duplicar dado nem apagar o que um teste manual já alterou.
+
+Runner configurado em `prisma.config.ts` (`migrations.seed`): `ts-node`, não `tsx` — já é devDependency do projeto (Jest/e2e usam), então o seed não introduz ferramenta nova.
