@@ -1,0 +1,241 @@
+import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { AppModule } from '../src/app.module';
+import { FiltroDeExcecoes } from '../src/common/erros/filtro-excecoes';
+
+/**
+ * Reprodução de docs/matriz-de-acesso.md, célula a célula.
+ *
+ * Roda contra o Postgres real com os dados do seed — de propósito. Um teste
+ * de autorização com Prisma mockado prova apenas que o mock foi configurado
+ * como o autor esperava; não prova que o guard nega. Aqui, se qualquer um dos
+ * três guards for removido do app.module, alguma linha desta tabela fica
+ * vermelha.
+ *
+ * Pré-requisito: `npx prisma migrate reset` (aplica migrations e roda o seed).
+ */
+
+const SENHA = 'Senha@123';
+
+const CONTAS = {
+  ADMIN: 'admin@pad.local',
+  ENFERMEIRO: 'ana.ferreira@pad.local',
+  MEDICO: 'carla.nogueira@pad.local',
+  // Segundo médico: existe para provar que "ser médico" não basta — é o
+  // não vinculado das linhas 6, 11 e 17 da matriz.
+  MEDICO_ALHEIO: 'diego.ramos@pad.local',
+} as const;
+
+type Conta = keyof typeof CONTAS;
+
+// Ids fixos do seed. Ver prisma/seed.ts.
+const ATENDIMENTO_DA_CARLA = 'c0000000-0000-4000-8000-000000000006'; // EM_ANDAMENTO
+const ATENDIMENTO_NA_FILA = 'c0000000-0000-4000-8000-000000000001'; // AGUARDANDO
+const ATENDIMENTO_INEXISTENTE = 'c0000000-0000-4000-8000-0000000000ff';
+
+describe('Matriz de autorização (e2e)', () => {
+  let app: INestApplication<App>;
+  const tokens = {} as Record<Conta, string>;
+
+  beforeAll(async () => {
+    const fixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = fixture.createNestApplication();
+    // O filtro global vem de APP_FILTER no módulo, mas o Nest só o aplica na
+    // instância criada por NestFactory. No teste, registra na mão para que os
+    // códigos aqui sejam os mesmos que o cliente recebe em produção.
+    app.useGlobalFilters(new FiltroDeExcecoes());
+    await app.init();
+
+    for (const [conta, email] of Object.entries(CONTAS) as [Conta, string][]) {
+      const resposta = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, senha: SENHA });
+
+      // Sem o corpo, 401 do guard (NAO_AUTENTICADO) e 401 de senha
+      // (CREDENCIAIS_INVALIDAS) parecem o mesmo erro. O segundo some com
+      // `npx prisma db seed`; o primeiro é rota pública que o JWT engoliu.
+      if (resposta.status !== 200) {
+        throw new Error(
+          `login ${email} → ${resposta.status} ${JSON.stringify(resposta.body)}`,
+        );
+      }
+      tokens[conta] = (resposta.body as { token: string }).token;
+    }
+  });
+
+  afterAll(async () => {
+    // `?.` porque se o beforeAll falhar (ambiente mal configurado, banco fora
+    // do ar) o app nunca é criado, e um erro no afterAll esconderia a causa
+    // real atrás de "Cannot read properties of undefined".
+    await app?.close();
+  });
+
+  const comToken = (conta: Conta) => ({
+    Authorization: `Bearer ${tokens[conta]}`,
+  });
+
+  describe('login', () => {
+    it('senha errada → 401', async () => {
+      const r = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: CONTAS.ADMIN, senha: 'errada' });
+
+      expect(r.status).toBe(401);
+      expect((r.body as { codigo: string }).codigo).toBe(
+        'CREDENCIAIS_INVALIDAS',
+      );
+    });
+
+    it('e-mail inexistente devolve a mesma resposta de senha errada', async () => {
+      const r = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'ninguem@pad.local', senha: SENHA });
+
+      // Mesmo código e mesma mensagem: a API não confirma quais e-mails
+      // existem. Enumerar contas é o passo anterior à força bruta.
+      expect(r.status).toBe(401);
+      expect((r.body as { codigo: string }).codigo).toBe(
+        'CREDENCIAIS_INVALIDAS',
+      );
+    });
+
+    it('corpo inválido → 400', async () => {
+      const r = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'não-é-email', senha: '' });
+
+      expect(r.status).toBe(400);
+    });
+  });
+
+  describe('rota pública', () => {
+    it('GET /saude sem token → 200', async () => {
+      const r = await request(app.getHttpServer()).get('/saude');
+      expect(r.status).toBe(200);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // A tabela. Uma linha por célula da matriz que já tem rota implementada.
+  // ---------------------------------------------------------------------
+
+  interface Caso {
+    descricao: string;
+    conta: Conta | 'ANONIMO';
+    rota: string;
+    esperado: number;
+  }
+
+  const CASOS: Caso[] = [
+    // Linha 2 da matriz — fila. ADMIN não vê dado clínico.
+    {
+      descricao: 'fila / anônimo',
+      conta: 'ANONIMO',
+      rota: '/atendimentos',
+      esperado: 401,
+    },
+    {
+      descricao: 'fila / enfermeiro',
+      conta: 'ENFERMEIRO',
+      rota: '/atendimentos',
+      esperado: 200,
+    },
+    {
+      descricao: 'fila / médico',
+      conta: 'MEDICO',
+      rota: '/atendimentos',
+      esperado: 200,
+    },
+    {
+      descricao: 'fila / admin',
+      conta: 'ADMIN',
+      rota: '/atendimentos',
+      esperado: 403,
+    },
+
+    // Linhas 25 a 27 — detalhe do atendimento, escopo por vínculo.
+    {
+      descricao: 'detalhe / anônimo',
+      conta: 'ANONIMO',
+      rota: `/atendimentos/${ATENDIMENTO_DA_CARLA}`,
+      esperado: 401,
+    },
+    {
+      descricao: 'detalhe / admin',
+      conta: 'ADMIN',
+      rota: `/atendimentos/${ATENDIMENTO_DA_CARLA}`,
+      esperado: 403,
+    },
+    {
+      descricao: 'detalhe / médico vinculado',
+      conta: 'MEDICO',
+      rota: `/atendimentos/${ATENDIMENTO_DA_CARLA}`,
+      esperado: 200,
+    },
+    {
+      descricao: 'detalhe / médico NÃO vinculado — troca de id na URL',
+      conta: 'MEDICO_ALHEIO',
+      rota: `/atendimentos/${ATENDIMENTO_DA_CARLA}`,
+      esperado: 403,
+    },
+    {
+      descricao: 'detalhe / atendimento na fila, ainda sem dono',
+      conta: 'ENFERMEIRO',
+      rota: `/atendimentos/${ATENDIMENTO_NA_FILA}`,
+      esperado: 200,
+    },
+    {
+      descricao: 'detalhe / id inexistente responde 403, não 404',
+      conta: 'MEDICO',
+      rota: `/atendimentos/${ATENDIMENTO_INEXISTENTE}`,
+      esperado: 403,
+    },
+    {
+      // Guard roda antes do ParseUUIDPipe: id malformado não pode virar 500.
+      descricao: 'detalhe / id malformado',
+      conta: 'MEDICO',
+      rota: '/atendimentos/abc',
+      esperado: 403,
+    },
+  ];
+
+  // `$descricao` em vez de `%s`: com linhas em objeto o Jest interpola pelo
+  // nome do campo. A versão com printf posicional consumia os argumentos na
+  // ordem da tupla e imprimia "NaN" no lugar do status esperado.
+  it.each(CASOS)(
+    '$descricao → $esperado',
+    async ({ conta, rota, esperado }) => {
+      const requisicao = request(app.getHttpServer()).get(rota);
+
+      if (conta !== 'ANONIMO') {
+        requisicao.set(comToken(conta));
+      }
+
+      const resposta = await requisicao;
+      expect(resposta.status).toBe(esperado);
+    },
+  );
+
+  describe('token', () => {
+    it('token forjado → 401', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/atendimentos')
+        .set({ Authorization: 'Bearer nao.e.um.token' });
+
+      expect(r.status).toBe(401);
+    });
+
+    it('sem prefixo Bearer → 401', async () => {
+      const r = await request(app.getHttpServer())
+        .get('/atendimentos')
+        .set({ Authorization: tokens.MEDICO });
+
+      expect(r.status).toBe(401);
+    });
+  });
+});

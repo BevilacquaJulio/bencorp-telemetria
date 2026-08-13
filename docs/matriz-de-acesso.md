@@ -36,6 +36,9 @@ A matriz foi escrita antes das rotas, de propósito: preencher célula a célula
 | 22 | `POST /usuarios` | **403** | **403** | 201 | 401 |
 | 23 | `PATCH /usuarios/:id` | **403** | **403** | 200 | 401 |
 | 24 | `GET /auditoria` | **403** | **403** | **200** | 401 |
+| 25 | `GET /atendimentos/:id` — vinculado | 200 | 200 | **403** | 401 |
+| 26 | `GET /atendimentos/:id` — não vinculado | **403** | **403** | **403** | 401 |
+| 27 | `GET /atendimentos/:id` — ainda `AGUARDANDO`, sem profissional | 200 | 200 | **403** | 401 |
 
 ## Decisões que a matriz registra
 
@@ -44,6 +47,10 @@ A matriz foi escrita antes das rotas, de propósito: preencher célula a célula
 **Administrador não acessa nenhum dado clínico (linhas 2, 14 e 15).** O requisito original restringe o acesso do administrador ao prontuário. A restrição foi estendida à fila e à listagem de pacientes porque ambas exibem nome, contato e classificação de risco — informação clínica identificável. O papel administra identidade e permissão, não assistência.
 
 **Administrador acessa o log de auditoria (linha 24).** É a contrapartida da decisão anterior: o administrador enxerga quem acessou qual paciente e quando, sem acessar o conteúdo. Metadado de acesso é instrumento de governança; conteúdo assistencial não é.
+
+**Atendimento sem profissional é visível para os papéis clínicos (linha 27).** Enquanto está `AGUARDANDO`, ninguém está vinculado — exigir vínculo tornaria impossível abrir o primeiro atendimento da fila para então assumi-lo. A permissão dura só até alguém assumir: a partir daí valem as linhas 25 e 26. A regra é do `EscopoGuard`, e as rotas que não podem admiti-la (prontuário) declaram `permitirSemVinculo: false`.
+
+**Identificador inexistente ou malformado responde `403`, nunca `404`.** Distinguir "não existe" de "não é seu" transformaria a rota num oráculo de existência: bastaria varrer identificadores e separar as respostas para descobrir quantos atendimentos o sistema tem.
 
 **Permissão não se resume ao papel (linhas 6, 11 e 17).** Um médico autenticado que solicita o prontuário de um atendimento ao qual não está vinculado recebe `403`. Sem essa verificação de vínculo, trocar o identificador na URL exporia dado de outro paciente.
 

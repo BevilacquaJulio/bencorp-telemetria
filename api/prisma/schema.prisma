@@ -66,6 +66,7 @@ model Usuario {
   criadoEm  DateTime @default(now()) @db.Timestamptz(3)
 
   atendimentos   Atendimento[]
+  triagens       Triagem[]
   prontuarios    Prontuario[]
   adendos        ProntuarioAdendo[]
   salaTokens     SalaToken[]
@@ -143,6 +144,10 @@ model Triagem {
   criadoEm DateTime @default(now()) @db.Timestamptz(3)
 
   atendimento Atendimento @relation(fields: [atendimentoId], references: [id])
+  // Sem esta relação, autorId seria uma coluna solta, sem chave estrangeira:
+  // "quem triou" poderia apontar para um usuário que não existe e o banco
+  // aceitaria calado. Num sistema que se propõe auditável, isso não fecha.
+  autor       Usuario     @relation(fields: [autorId], references: [id])
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Banco de dados — PostgreSQL 16 + Prisma 7
 
-## Prisma 7 — quatro diferenças que quebram o código se ignoradas
+## Prisma 7 — cinco diferenças que quebram o código se ignoradas
 
 O projeto usa **Prisma 7.9**. Não vale conhecimento de Prisma 5/6 aqui.
 
@@ -29,6 +29,8 @@ O projeto usa **Prisma 7.9**. Não vale conhecimento de Prisma 5/6 aqui.
 3. **A URL do banco mora em `prisma.config.ts`**, não no bloco `datasource` do schema. O `datasource` só declara o provider.
 
 4. **`generated/` fica fora de `node_modules`** e é ignorado pelo Git. `prisma generate` precisa rodar no build do Docker.
+
+5. **Jest precisa de `--experimental-vm-modules`.** No `$connect()`, o Prisma 7 faz `import()` dinâmico do compilador WASM (`query_compiler_fast_bg.postgresql.js`). O Jest intercepta esse `import()` e, sem a flag, derruba o `app.init()` com `A dynamic import callback was invoked without --experimental-vm-modules` — todos os e2e falham no boot, antes de qualquer asserção. Os scripts `test` / `test:e2e` já passam a flag via `node --experimental-vm-modules ./node_modules/jest/bin/jest.js`. Sem isso, `npx jest` sozinho volta a quebrar.
 
 ## Não negociável
 

@@ -1,8 +1,31 @@
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+
+  app.use(helmet());
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    credentials: true,
+  });
+
+  const config = new DocumentBuilder()
+    .setTitle('PAD — Pronto Atendimento Digital')
+    .setDescription(
+      'API do case Bencorp. Os códigos 401, 403, 409 e 422 são parte do contrato: ' +
+        'cada um corresponde a uma regra de negócio documentada em docs/invariantes.md.',
+    )
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+
+  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
+
+  const porta = Number(process.env.API_PORT ?? 3000);
+  await app.listen(porta, '0.0.0.0');
 }
-bootstrap();
+
+void bootstrap();
