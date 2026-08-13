@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
+import { StatusAtendimento } from '../../../../generated/prisma/client';
 import { AcessoNegado } from '../../erros/erros';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -78,7 +79,7 @@ export class EscopoGuard implements CanActivate {
   ): Promise<boolean> {
     const atendimento = await this.prisma.atendimento.findUnique({
       where: { id },
-      select: { profissionalId: true },
+      select: { profissionalId: true, status: true },
     });
 
     // Inexistente também é 403, não 404. Responder 404 aqui transformaria a
@@ -88,12 +89,15 @@ export class EscopoGuard implements CanActivate {
       throw new AcessoNegado();
     }
 
-    // Ninguém assumiu ainda. Todo profissional enxerga a fila e precisa poder
-    // abrir o atendimento antes de assumir — exigir vínculo aqui tornaria
-    // impossível assumir o primeiro. Rotas de prontuário não usam esta
-    // permissão, e por isso passam `permitirSemVinculo: false`.
+    // A ausência de profissional não basta para liberar o recurso: atendimentos
+    // cancelados antes de serem assumidos também ficam com profissionalId nulo.
+    // A exceção existe somente para a fila AGUARDANDO, quando o vínculo ainda
+    // não foi criado e o profissional precisa abrir o item antes de assumi-lo.
     if (atendimento.profissionalId === null) {
-      if (config.permitirSemVinculo) {
+      if (
+        config.permitirSemVinculo &&
+        atendimento.status === StatusAtendimento.AGUARDANDO
+      ) {
         return true;
       }
       throw new AcessoNegado();

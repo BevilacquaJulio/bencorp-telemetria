@@ -33,6 +33,7 @@ type Conta = keyof typeof CONTAS;
 // Ids fixos do seed. Ver prisma/seed.ts.
 const ATENDIMENTO_DA_CARLA = 'c0000000-0000-4000-8000-000000000006'; // EM_ANDAMENTO
 const ATENDIMENTO_NA_FILA = 'c0000000-0000-4000-8000-000000000001'; // AGUARDANDO
+const ATENDIMENTO_CANCELADO = 'c0000000-0000-4000-8000-000000000014'; // sem profissional
 const ATENDIMENTO_INEXISTENTE = 'c0000000-0000-4000-8000-0000000000ff';
 
 describe('Matriz de autorização (e2e)', () => {
@@ -188,6 +189,12 @@ describe('Matriz de autorização (e2e)', () => {
       conta: 'ENFERMEIRO',
       rota: `/atendimentos/${ATENDIMENTO_NA_FILA}`,
       esperado: 200,
+    },
+    {
+      descricao: 'detalhe / cancelado sem profissional continua protegido',
+      conta: 'ENFERMEIRO',
+      rota: `/atendimentos/${ATENDIMENTO_CANCELADO}`,
+      esperado: 403,
     },
     {
       descricao: 'detalhe / id inexistente responde 403, não 404',
