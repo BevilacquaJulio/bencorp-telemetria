@@ -1,0 +1,102 @@
+---
+description: Regras de banco de dados — Prisma, PostgreSQL, migrations, constraints e concorrência.
+globs: ["api/prisma/**", "api/src/**/*.repository.ts", "api/src/common/prisma/**"]
+alwaysApply: false
+---
+
+# Banco de dados — PostgreSQL + Prisma
+
+## Não negociável
+
+- `provider = "postgresql"`. Nunca MySQL, nunca SQLite (nem em teste — a semântica de lock que estamos testando é do Postgres).
+- Migrations **versionadas e commitadas**. Nunca `prisma db push`.
+- Chave primária `String @id @default(uuid()) @db.Uuid`. IDs não enumeráveis reduzem superfície de acesso indevido por troca de ID na URL.
+- Nomes de campo em português (`criadoEm`, `entradaFila`, `finalizadoEm`).
+
+## Concorrência — sempre no banco
+
+**Padrão obrigatório (compare-and-swap):** a condição de estado vai no `WHERE`, nunca num `if` anterior.
+
+```ts
+const { count } = await this.prisma.atendimento.updateMany({
+  where: { id, status: 'AGUARDANDO' },
+  data:  { status: 'EM_ANDAMENTO', profissionalId, iniciadoEm: new Date() },
+});
+if (count === 0) throw new ConflitoDeEstado('ATENDIMENTO_JA_INICIADO'); // 409
+```
+
+Por quê: sob `READ COMMITTED`, a segunda transação espera no bloqueio da linha e, depois que a primeira confirma, o Postgres **reavalia o `WHERE` contra a versão nova** da linha. A condição falha e `count` é 0. Uma única ida ao banco, sem transação explícita, sem risco de travamento cruzado.
+
+Use `updateMany` (não `update`) porque a condição composta não é chave única.
+
+O comentário no código deve explicar isso em palavras simples — quem ler depois precisa entender por que a condição está no `WHERE` e não num `if`, senão vai "simplificar" e quebrar.
+
+**Nunca** implemente concorrência com: `findFirst` + `if`, mutex na aplicação, ou `count()` prévio.
+
+`SELECT ... FOR UPDATE` só é aceitável quando a decisão depende de ler múltiplas linhas antes de escrever — e nesse caso, comente por que o CAS não bastava.
+
+## Constraints que existem só no SQL cru
+
+Prisma não gera índice parcial nem trigger. Crie com:
+
+```bash
+npx prisma migrate dev --create-only --name <nome>
+# edite o .sql gerado
+npx prisma migrate dev
+```
+
+**Um profissional, um atendimento ativo:**
+
+```sql
+CREATE UNIQUE INDEX uniq_prof_atendimento_ativo
+  ON "Atendimento" ("profissionalId")
+  WHERE status = 'EM_ANDAMENTO';
+```
+
+Violação chega como `PrismaClientKnownRequestError` com `code === 'P2002'` → mapeie para `409 PROFISSIONAL_JA_EM_ATENDIMENTO`.
+
+**Prontuário finalizado é imutável:**
+
+```sql
+CREATE OR REPLACE FUNCTION bloqueia_update_prontuario_finalizado()
+RETURNS trigger AS $$
+BEGIN
+  IF OLD."finalizadoEm" IS NOT NULL THEN
+    RAISE EXCEPTION 'PRONTUARIO_IMUTAVEL' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_prontuario_imutavel
+  BEFORE UPDATE ON "Prontuario"
+  FOR EACH ROW EXECUTE FUNCTION bloqueia_update_prontuario_finalizado();
+```
+
+## Índices — só os que sustentam uma query real
+
+- `@@index([status, entradaFila])` — a query da fila filtra por status e ordena por entrada. Ordem das colunas importa.
+- `@@index([pacienteId])` — histórico do paciente.
+- `@@index([pacienteId, criadoEm])` e `@@index([usuarioId, criadoEm])` em `LogAuditoria`.
+- `cpf` e `email` como `@unique` (já geram índice).
+
+Não crie índice "por precaução". Cada um custa escrita.
+
+## Transações
+
+Use `$transaction` quando duas escritas precisam ser atômicas. Caso canônico — finalizar atendimento:
+
+```ts
+await this.prisma.$transaction([
+  this.prisma.atendimento.updateMany({ where: { id, status: 'EM_ANDAMENTO' }, data: { status: 'FINALIZADO', finalizadoEm: agora } }),
+  this.prisma.salaToken.updateMany({ where: { atendimentoId: id, revogadoEm: null }, data: { revogadoEm: agora } }),
+]);
+```
+
+A auditoria fica **fora** da transação de negócio, deliberadamente: um rollback de negócio não deve apagar a evidência de que houve acesso.
+
+## Seed
+
+`prisma/seed.ts` cria: 1 ADMIN, 2 ENFERMEIRO, 2 MEDICO, ~10 pacientes, ~15 atendimentos distribuídos entre os quatro status e entre hoje / ontem / semana passada — os filtros da fila precisam ter o que filtrar. Senhas em texto no README, hash no banco.
+
+Roda automaticamente no boot do container da API.
