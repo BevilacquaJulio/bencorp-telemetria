@@ -244,10 +244,10 @@ const TRIAGEM_POR_RISCO: Record<
 
 // Conteúdo de prontuário por atendimento finalizado — texto curto, mas
 // específico o bastante pra não parecer lorem ipsum na demonstração.
-const PRONTUARIOS: Record<
-  string,
-  { anamnese: string; conduta: string; prescricao: string | null }
-> = {
+// `satisfies` em vez de anotação: valida o formato de cada entrada e ainda
+// deixa as chaves como literais, então um typo em AtendimentoSeed.prontuario
+// vira erro de compilação em vez de `undefined.anamnese` em runtime.
+const PRONTUARIOS = {
   finalizado1: {
     anamnese:
       'Paciente refere febre de 38,9°C iniciada há 24h, associada a mialgia e cefaleia. Nega dispneia. Ausculta pulmonar sem alterações.',
@@ -285,7 +285,10 @@ const PRONTUARIOS: Record<
       'Em investigação — nota provisória, prontuário ainda não finalizado.',
     prescricao: null,
   },
-};
+} satisfies Record<
+  string,
+  { anamnese: string; conduta: string; prescricao: string | null }
+>;
 
 // ---------------------------------------------------------------------------
 // Atendimentos — a tabela que realmente importa pro case. Cobre os quatro
@@ -314,7 +317,9 @@ interface AtendimentoSeed {
   risco: Risco | null;
   triagemAutor: 'ana' | 'bruno' | null;
   triagemHorasAtras: number | null;
-  profissional: 'carla' | 'diego' | null;
+  // ENFERMEIRO também inicia atendimento; o índice único parcial no banco
+  // exige profissionalId distinto em cada linha EM_ANDAMENTO.
+  profissional: 'ana' | 'bruno' | 'carla' | 'diego' | null;
   iniciadoEmHorasAtras: number | null;
   finalizadoEmHorasAtras: number | null;
   canceladoEmHorasAtras: number | null;
@@ -417,7 +422,10 @@ const ATENDIMENTOS: AtendimentoSeed[] = [
     comAdendo: false,
   },
 
-  // EM_ANDAMENTO (4) — um por médico sem prontuário, um com prontuário em rascunho.
+  // EM_ANDAMENTO (4) — um por profissional. Dois no mesmo médico quebram o
+  // índice uniq_profissional_atendimento_ativo. Enfermeiro também inicia
+  // atendimento (matriz de acesso), então os quatro usuários clínicos
+  // cobrem os quatro ativos: dois médicos (um com rascunho) e dois enfermeiros.
   {
     id: 'c0000000-0000-4000-8000-000000000006',
     pacienteIndex: 5,
@@ -461,7 +469,7 @@ const ATENDIMENTOS: AtendimentoSeed[] = [
     risco: Risco.VERMELHO,
     triagemAutor: 'ana',
     triagemHorasAtras: ONTEM + 5,
-    profissional: 'carla',
+    profissional: 'ana',
     iniciadoEmHorasAtras: ONTEM + 3,
     finalizadoEmHorasAtras: null,
     canceladoEmHorasAtras: null,
@@ -478,7 +486,7 @@ const ATENDIMENTOS: AtendimentoSeed[] = [
     risco: Risco.VERDE,
     triagemAutor: 'bruno',
     triagemHorasAtras: HOJE + 6.5,
-    profissional: 'diego',
+    profissional: 'bruno',
     iniciadoEmHorasAtras: HOJE + 5,
     finalizadoEmHorasAtras: null,
     canceladoEmHorasAtras: null,
@@ -654,38 +662,55 @@ async function semearAtendimentos(
 
     if (spec.prontuario && spec.autorProntuario) {
       const conteudo = PRONTUARIOS[spec.prontuario];
-      const prontuario = await prisma.prontuario.upsert({
-        where: { atendimentoId: spec.id },
-        update: {},
-        create: {
-          atendimentoId: spec.id,
-          autorId: usuarios[spec.autorProntuario].id,
-          anamnese: conteudo.anamnese,
-          conduta: conteudo.conduta,
-          prescricao: conteudo.prescricao,
-          finalizadoEm:
-            spec.prontuarioFinalizado && spec.finalizadoEmHorasAtras !== null
-              ? horasAtras(spec.finalizadoEmHorasAtras)
-              : null,
-        },
-        select: { id: true },
-      });
+
+      // Aqui NÃO pode ser upsert. O gatilho trg_prontuario_imutavel recusa
+      // qualquer UPDATE em prontuário com finalizadoEm preenchido, e o Prisma
+      // injeta `atualizadoEm` (@updatedAt) mesmo quando o update é `{}` —
+      // então o `update: {}` que é inofensivo nas outras tabelas viraria um
+      // UPDATE real aqui e mataria o seed no segundo boot do container.
+      // Ler antes e criar só se faltar mantém a repetição segura.
+      const prontuario =
+        (await prisma.prontuario.findUnique({
+          where: { atendimentoId: spec.id },
+          select: { id: true },
+        })) ??
+        (await prisma.prontuario.create({
+          data: {
+            atendimentoId: spec.id,
+            autorId: usuarios[spec.autorProntuario].id,
+            anamnese: conteudo.anamnese,
+            conduta: conteudo.conduta,
+            prescricao: conteudo.prescricao,
+            finalizadoEm:
+              spec.prontuarioFinalizado && spec.finalizadoEmHorasAtras !== null
+                ? horasAtras(spec.finalizadoEmHorasAtras)
+                : null,
+          },
+          select: { id: true },
+        }));
 
       // Adendo de exemplo, só no primeiro finalizado — mostra o formato de
       // correção append-only sem precisar rodar a API pra ver como fica.
+      // Mesmo motivo do prontuário, e um extra: adendo é append-only por
+      // definição, então nem deveria existir caminho de UPDATE no seed.
       if (spec.comAdendo) {
-        await prisma.prontuarioAdendo.upsert({
-          where: { id: 'd0000000-0000-4000-8000-000000000001' },
-          update: {},
-          create: {
-            id: 'd0000000-0000-4000-8000-000000000001',
-            prontuarioId: prontuario.id,
-            autorId: usuarios[spec.autorProntuario].id,
-            texto:
-              'Retificação: pressão arterial correta de admissão era 128/84, não 130/85 como registrado inicialmente.',
-            criadoEm: horasAtras((spec.finalizadoEmHorasAtras ?? 0) - 0.5),
-          },
+        const adendoId = 'd0000000-0000-4000-8000-000000000001';
+        const adendoExiste = await prisma.prontuarioAdendo.findUnique({
+          where: { id: adendoId },
+          select: { id: true },
         });
+        if (!adendoExiste) {
+          await prisma.prontuarioAdendo.create({
+            data: {
+              id: adendoId,
+              prontuarioId: prontuario.id,
+              autorId: usuarios[spec.autorProntuario].id,
+              texto:
+                'Retificação: pressão arterial correta de admissão era 128/84, não 130/85 como registrado inicialmente.',
+              criadoEm: horasAtras((spec.finalizadoEmHorasAtras ?? 0) - 0.5),
+            },
+          });
+        }
       }
     }
   }

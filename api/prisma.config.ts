@@ -7,9 +7,13 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
-    // ts-node, não tsx: já é devDependency do projeto (usado pelo Jest/e2e),
-    // então o seed não introduz uma ferramenta nova só pra isso.
-    seed: 'ts-node prisma/seed.ts',
+    // tsx, não ts-node: o client que o Prisma 7 gera importa seus próprios
+    // arquivos internos com extensão .js apontando pra fonte .ts (convenção
+    // do moduleResolution "nodenext"). O require() do ts-node não remapeia
+    // isso e quebra com "Cannot find module './internal/class.js'" — só o
+    // tsc de verdade (o build do Nest) resolve isso, ou um runtime feito
+    // pra isso. Testado: ts-node falha nesse require; tsx carrega normal.
+    seed: 'tsx prisma/seed.ts',
   },
   datasource: {
     url: process.env['DATABASE_URL'],
