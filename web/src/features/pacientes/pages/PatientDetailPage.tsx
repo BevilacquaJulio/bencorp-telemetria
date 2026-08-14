@@ -63,10 +63,12 @@ export function PatientDetailPage() {
           <span className="patient-profile__avatar" aria-hidden="true">
             {initials(nome)}
           </span>
-          <div>
+          <div className="patient-profile__copy">
             <p>Detalhes do paciente</p>
             <h1>{nome}</h1>
-            <span>Acesso autorizado para o seu perfil profissional.</span>
+            <p className="patient-profile__status">
+              Acesso autorizado para o seu perfil profissional.
+            </p>
           </div>
         </div>
 
