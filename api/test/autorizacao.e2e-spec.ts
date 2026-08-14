@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { randomInt } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
@@ -131,6 +132,8 @@ describe('Matriz de autorização (e2e)', () => {
     conta: Conta | 'ANONIMO';
     rota: string;
     esperado: number;
+    metodo?: 'GET' | 'POST';
+    corpo?: () => Record<string, unknown>;
   }
 
   const CASOS: Caso[] = [
@@ -316,6 +319,24 @@ describe('Matriz de autorização (e2e)', () => {
       rota: '/atendimentos/abc',
       esperado: 403,
     },
+
+    // Linha 29 — cadastro e entrada na fila são exclusivos da enfermagem.
+    ...(['ENFERMEIRO', 'MEDICO', 'ADMIN', 'ANONIMO'] as const).map(
+      (conta): Caso => ({
+        descricao: `cadastro de paciente / ${conta.toLowerCase()}`,
+        conta,
+        rota: '/atendimentos/cadastrar-paciente',
+        metodo: 'POST',
+        corpo: () => ({
+          nome: 'Paciente da matriz de autorização',
+          cpf: `8${randomInt(10_000_000_000).toString().padStart(10, '0')}`,
+          contato: '(31) 98888-8888',
+          nascimento: '1990-06-15',
+        }),
+        esperado:
+          conta === 'ENFERMEIRO' ? 201 : conta === 'ANONIMO' ? 401 : 403,
+      }),
+    ),
   ];
 
   // `$descricao` em vez de `%s`: com linhas em objeto o Jest interpola pelo
@@ -323,8 +344,11 @@ describe('Matriz de autorização (e2e)', () => {
   // ordem da tupla e imprimia "NaN" no lugar do status esperado.
   it.each(CASOS)(
     '$descricao → $esperado',
-    async ({ conta, rota, esperado }) => {
-      const requisicao = request(app.getHttpServer()).get(rota);
+    async ({ conta, rota, esperado, metodo = 'GET', corpo }) => {
+      const requisicao =
+        metodo === 'POST'
+          ? request(app.getHttpServer()).post(rota).send(corpo?.())
+          : request(app.getHttpServer()).get(rota);
 
       if (conta !== 'ANONIMO') {
         requisicao.set(comToken(conta));
