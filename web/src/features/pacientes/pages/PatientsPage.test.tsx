@@ -60,7 +60,8 @@ describe('PatientsPage', () => {
     expect(screen.getByText('123.456.789-01')).toBeInTheDocument()
     expect(screen.getByText('(11) 99999-9999')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Ver detalhes' }))
+    // O card inteiro virou link: o alvo acessível é o nome do paciente.
+    await user.click(screen.getByRole('link', { name: 'Maria da Silva' }))
     expect(await screen.findByText('Detalhes carregados')).toBeInTheDocument()
   })
 

@@ -49,7 +49,9 @@ describe('PatientDetailPage', () => {
             queixa: 'Cefaleia e mal-estar',
             pa: '120/80',
             fc: 82,
-            temperatura: 37.2,
+            // A API devolve Decimal como string. Number aqui esconderia o
+            // crash que deixava a ficha em branco.
+            temperatura: '37.2',
             satO2: 98,
             criadoEm: '2026-08-14T12:10:00.000Z',
           },
@@ -75,6 +77,7 @@ describe('PatientDetailPage', () => {
     expect(screen.getByText('(11) 99999-9999')).toBeInTheDocument()
     expect(screen.getByText('Cefaleia e mal-estar')).toBeInTheDocument()
     expect(screen.getByText('120/80')).toBeInTheDocument()
+    expect(screen.getByText('37.2')).toBeInTheDocument()
     expect(
       screen.getByText('Paciente relata cefaleia desde ontem.'),
     ).toBeInTheDocument()
