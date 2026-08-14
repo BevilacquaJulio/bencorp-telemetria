@@ -2270,6 +2270,76 @@ tbody tr:last-child td {
   font-size: 0.68rem;
 }
 
+.post-meeting-workspace {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.7fr) minmax(360px, 1.3fr);
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgb(232 247 247 / 0.7), transparent 42%),
+    var(--surface);
+  box-shadow: var(--shadow-sm);
+  align-items: start;
+}
+
+.post-meeting-workspace__heading {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.post-meeting-workspace__heading > span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  color: var(--brand-teal-700);
+  border: 1px solid #c7e4e3;
+  border-radius: 13px;
+  background: var(--brand-teal-soft);
+  place-items: center;
+}
+
+.post-meeting-workspace__heading p,
+.post-meeting-workspace__heading h2,
+.post-meeting-workspace__heading small {
+  display: block;
+  margin: 0;
+}
+
+.post-meeting-workspace__heading p {
+  color: var(--brand-teal-700);
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.post-meeting-workspace__heading h2 {
+  margin-top: 0.35rem;
+  color: var(--ink);
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.post-meeting-workspace__heading small {
+  margin-top: 0.65rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.65;
+}
+
+.post-meeting-workspace__actions {
+  min-width: 0;
+}
+
+.post-meeting-workspace__actions > .clinical-panel {
+  box-shadow: none;
+}
+
 .conference-screen {
   position: fixed;
   inset: 0;
@@ -2345,6 +2415,16 @@ tbody tr:last-child td {
 
 .conference-disconnected small {
   color: #ffccd0;
+}
+
+.conference-disconnected__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.conference-disconnected__actions .button--ghost {
+  color: #d8f5f4;
 }
 
 .care-workspace {
@@ -2506,7 +2586,8 @@ tbody tr:last-child td {
 }
 
 .triage-reference,
-.clinical-confirmation {
+.clinical-confirmation,
+.clinical-next-step {
   padding: 0.8rem;
   border: 1px solid #d5e7e7;
   border-radius: 11px;
@@ -2514,13 +2595,15 @@ tbody tr:last-child td {
 }
 
 .triage-reference strong,
-.clinical-confirmation strong {
+.clinical-confirmation strong,
+.clinical-next-step strong {
   color: var(--ink);
   font-size: 0.73rem;
 }
 
 .triage-reference p,
-.clinical-confirmation p {
+.clinical-confirmation p,
+.clinical-next-step p {
   margin-top: 0.3rem;
   color: var(--text);
   font-size: 0.69rem;
@@ -2968,6 +3051,10 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
 
+  .post-meeting-workspace {
+    grid-template-columns: 1fr;
+  }
+
   .room-lobby__visual {
     min-height: 220px;
   }
@@ -3236,6 +3323,16 @@ tbody tr:last-child td {
     grid-column: 1 / -1;
     width: 100%;
   }
+
+  .conference-disconnected__actions {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .conference-disconnected__actions .button {
+    width: auto;
+    flex: 1;
+  }
 }
 
 @media (max-width: 440px) {
@@ -3272,7 +3369,8 @@ tbody tr:last-child td {
 
   .user-create-form__actions,
   .clinical-end-actions,
-  .patient-invite-card__actions {
+  .patient-invite-card__actions,
+  .conference-disconnected__actions {
     align-items: stretch;
     flex-direction: column;
   }

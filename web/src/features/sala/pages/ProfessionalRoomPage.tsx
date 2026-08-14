@@ -2,6 +2,7 @@ import {
   ArrowLeftIcon,
   LockKeyIcon,
   ShieldCheckIcon,
+  SignOutIcon,
   VideoCameraIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
@@ -24,6 +25,7 @@ import { useAuth } from '../../auth/auth-context'
 import { MedicalActions } from '../components/MedicalActions'
 import { NursingActions } from '../components/NursingActions'
 import { PatientInviteCard } from '../components/PatientInviteCard'
+import { PostMeetingActions } from '../components/PostMeetingActions'
 import { createProfessionalRoomAccess } from '../sala.api'
 import type { RoomAccess } from '../sala.types'
 
@@ -31,7 +33,8 @@ type ProfessionalWorkspaceProps = {
   access: RoomAccess
   attendance: AttendanceDetail
   role: 'ENFERMEIRO' | 'MEDICO'
-  onExit: () => void
+  onComplete: () => void
+  onReview: () => void
   onReconnect: () => void
   reconnecting: boolean
   reconnectError: unknown
@@ -41,7 +44,8 @@ function ProfessionalWorkspace({
   access,
   attendance,
   role,
-  onExit,
+  onComplete,
+  onReview,
   onReconnect,
   reconnecting,
   reconnectError,
@@ -72,20 +76,29 @@ function ProfessionalWorkspace({
             <div className="conference-disconnected" role="alert">
               <WarningCircleIcon size={23} weight="duotone" />
               <div>
-                <strong>A conexão com a sala foi interrompida</strong>
-                <p>Seu atendimento continua aberto. Tente entrar novamente.</p>
+                <strong>A videochamada foi encerrada</strong>
+                <p>
+                  O atendimento continua aberto. Revise as ações ou conecte-se
+                  novamente.
+                </p>
                 {reconnectError ? (
                   <small>{getApiErrorMessage(reconnectError)}</small>
                 ) : null}
               </div>
-              <Button
-                type="button"
-                size="sm"
-                loading={reconnecting}
-                onClick={onReconnect}
-              >
-                Reconectar
-              </Button>
+              <div className="conference-disconnected__actions">
+                <Button type="button" size="sm" onClick={onReview}>
+                  Revisar atendimento
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  loading={reconnecting}
+                  onClick={onReconnect}
+                >
+                  Reconectar
+                </Button>
+              </div>
             </div>
           ) : null}
         </section>
@@ -103,13 +116,23 @@ function ProfessionalWorkspace({
           <PatientInviteCard attendanceId={attendance.id} />
 
           {role === 'ENFERMEIRO' ? (
-            <NursingActions attendance={attendance} onComplete={onExit} />
+            <NursingActions
+              attendance={attendance}
+              allowDecision={disconnected}
+              onComplete={onComplete}
+            />
           ) : (
-            <MedicalActions attendance={attendance} onComplete={onExit} />
+            <MedicalActions attendance={attendance} onComplete={onComplete} />
           )}
 
-          <Button type="button" variant="ghost" size="sm" onClick={onExit}>
-            Sair da sala sem finalizar
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            icon={<SignOutIcon size={17} />}
+            onClick={onReview}
+          >
+            Encerrar videochamada e revisar atendimento
           </Button>
         </aside>
       </div>
@@ -121,6 +144,7 @@ export function ProfessionalRoomPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const [meetingEnded, setMeetingEnded] = useState(false)
   const attendance = useQuery({
     queryKey: ['attendance', id],
     queryFn: () => getAttendance(id),
@@ -141,7 +165,11 @@ export function ProfessionalRoomPage() {
         access={access.data}
         attendance={attendance.data}
         role={user.papel}
-        onExit={() => navigate('/fila')}
+        onComplete={() => navigate('/fila')}
+        onReview={() => {
+          setMeetingEnded(true)
+          access.reset()
+        }}
         onReconnect={() => access.mutate()}
         reconnecting={access.isPending}
         reconnectError={access.error}
@@ -212,6 +240,16 @@ export function ProfessionalRoomPage() {
             </small>
           </div>
         </section>
+      ) : null}
+
+      {attendance.data &&
+      (user?.papel === 'ENFERMEIRO' || user?.papel === 'MEDICO') ? (
+        <PostMeetingActions
+          attendance={attendance.data}
+          role={user.papel}
+          meetingEnded={meetingEnded}
+          onComplete={() => navigate('/fila')}
+        />
       ) : null}
     </div>
   )

@@ -199,7 +199,7 @@ describe('ProfessionalRoomPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Simular queda' }))
 
     expect(
-      screen.getByText('A conexão com a sala foi interrompida'),
+      screen.getByText('A videochamada foi encerrada'),
     ).toBeInTheDocument()
     expect(screen.queryByText('Fila profissional')).not.toBeInTheDocument()
 
@@ -241,6 +241,23 @@ describe('ProfessionalRoomPage', () => {
       }),
     })
 
+    expect(
+      screen.queryByRole('button', { name: 'Encaminhar para médico' }),
+    ).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Encerrar videochamada e revisar atendimento',
+      }),
+    )
+
+    expect(screen.queryByText('Sala conectada')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: 'Revise e conclua as ações assistenciais',
+      }),
+    ).toBeInTheDocument()
+
     await user.click(
       await screen.findByRole('button', { name: 'Encaminhar para médico' }),
     )
@@ -248,6 +265,27 @@ describe('ProfessionalRoomPage', () => {
 
     expect(mockedForwardAttendance).toHaveBeenCalledWith(attendance.id)
     expect(await screen.findByText('Fila profissional')).toBeInTheDocument()
+  })
+
+  it('mantém as ações acessíveis ao retomar um atendimento sem reabrir a reunião', async () => {
+    mockedGetAttendance.mockResolvedValue({
+      ...attendance,
+      triagem: {
+        queixa: 'Dor de cabeça desde o início da manhã',
+        pa: '120/80',
+        fc: 78,
+        temperatura: 36.5,
+        satO2: 99,
+        criadoEm: '2026-08-14T12:10:00.000Z',
+      },
+    })
+
+    renderRoom()
+
+    expect(
+      await screen.findByRole('button', { name: 'Encaminhar para médico' }),
+    ).toBeInTheDocument()
+    expect(mockedCreateAccess).not.toHaveBeenCalled()
   })
 
   it('permite ao médico salvar o prontuário e finalizar a consulta', async () => {
