@@ -118,7 +118,6 @@ function ProfessionalWorkspace({
           {role === 'ENFERMEIRO' ? (
             <NursingActions
               attendance={attendance}
-              allowDecision={disconnected}
               onComplete={onComplete}
             />
           ) : (

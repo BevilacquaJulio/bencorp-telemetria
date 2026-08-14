@@ -50,11 +50,7 @@ export function PostMeetingActions({
 
       <div className="post-meeting-workspace__actions">
         {role === 'ENFERMEIRO' ? (
-          <NursingActions
-            attendance={attendance}
-            allowDecision
-            onComplete={onComplete}
-          />
+          <NursingActions attendance={attendance} onComplete={onComplete} />
         ) : (
           <MedicalActions attendance={attendance} onComplete={onComplete} />
         )}

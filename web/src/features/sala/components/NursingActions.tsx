@@ -26,13 +26,11 @@ import type { AttendanceDetail } from '../../atendimentos/atendimentos.types'
 type NursingActionsProps = {
   attendance: AttendanceDetail
   onComplete: () => void
-  allowDecision?: boolean
 }
 
 export function NursingActions({
   attendance,
   onComplete,
-  allowDecision = true,
 }: NursingActionsProps) {
   const queryClient = useQueryClient()
   const [confirmation, setConfirmation] = useState<'forward' | 'finish' | null>(
@@ -126,32 +124,6 @@ export function NursingActions({
             Salvar triagem
           </Button>
         </form>
-      </section>
-    )
-  }
-
-  if (!allowDecision) {
-    return (
-      <section
-        className="clinical-panel"
-        aria-labelledby="nursing-decision-title"
-      >
-        <header className="clinical-panel__heading">
-          <span aria-hidden="true">
-            <CheckCircleIcon size={21} weight="duotone" />
-          </span>
-          <div>
-            <h2 id="nursing-decision-title">Triagem registrada</h2>
-            <p>{attendance.triagem.queixa}</p>
-          </div>
-        </header>
-        <div className="clinical-next-step" role="status">
-          <strong>Decisão disponível após a videochamada</strong>
-          <p>
-            Encerre a reunião para revisar a triagem, encaminhar ao médico ou
-            concluir este atendimento com calma.
-          </p>
-        </div>
       </section>
     )
   }

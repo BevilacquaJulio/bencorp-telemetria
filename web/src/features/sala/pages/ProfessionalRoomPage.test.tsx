@@ -207,7 +207,7 @@ describe('ProfessionalRoomPage', () => {
     expect(mockedCreateAccess).toHaveBeenCalledTimes(2)
   })
 
-  it('salva a triagem e encaminha o paciente para a fila médica', async () => {
+  it('salva a triagem e encaminha ao médico durante a videochamada', async () => {
     const user = userEvent.setup()
     const triagedAttendance: AttendanceDetail = {
       ...attendance,
@@ -242,9 +242,37 @@ describe('ProfessionalRoomPage', () => {
     })
 
     expect(
-      screen.queryByRole('button', { name: 'Encaminhar para médico' }),
-    ).not.toBeInTheDocument()
+      await screen.findByRole('button', { name: 'Encaminhar para médico' }),
+    ).toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: 'Encaminhar para médico' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
 
+    expect(mockedForwardAttendance).toHaveBeenCalledWith(attendance.id)
+    expect(await screen.findByText('Fila profissional')).toBeInTheDocument()
+  })
+
+  it('mantém o encaminhamento disponível depois de sair da videochamada', async () => {
+    const user = userEvent.setup()
+    const triagedAttendance: AttendanceDetail = {
+      ...attendance,
+      triagem: {
+        queixa: 'Dor de cabeça desde o início da manhã',
+        pa: '120/80',
+        fc: 78,
+        temperatura: 36.5,
+        satO2: 99,
+        criadoEm: '2026-08-14T12:10:00.000Z',
+      },
+    }
+    mockedGetAttendance.mockResolvedValue(triagedAttendance)
+    mockedForwardAttendance.mockResolvedValue(triagedAttendance)
+    renderRoom()
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Entrar na sala segura' }),
+    )
     await user.click(
       screen.getByRole('button', {
         name: 'Encerrar videochamada e revisar atendimento',
@@ -257,9 +285,8 @@ describe('ProfessionalRoomPage', () => {
         name: 'Revise e conclua as ações assistenciais',
       }),
     ).toBeInTheDocument()
-
     await user.click(
-      await screen.findByRole('button', { name: 'Encaminhar para médico' }),
+      screen.getByRole('button', { name: 'Encaminhar para médico' }),
     )
     await user.click(screen.getByRole('button', { name: 'Confirmar' }))
 
