@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ToastProvider } from '../../../components/ui/ToastProvider'
 import type { ApiErrorBody } from '../../../lib/api'
 import { AuthContext, type AuthContextValue } from '../../auth/auth-context'
 import {
@@ -48,6 +49,20 @@ function queueResponse(itens: AttendanceListItem[]): QueueResponse {
   return {
     itens,
     atendimentoAtivo: null,
+    // `resumo` vem do backend e não depende da paginação — por isso as
+    // contagens abaixo são derivadas do conjunto, não da página.
+    resumo: {
+      totalPeriodo: itens.length,
+      aguardando: itens.filter((item) => item.status === 'AGUARDANDO').length,
+      emAndamento: itens.filter((item) => item.status === 'EM_ANDAMENTO')
+        .length,
+      finalizados: 0,
+      cancelados: 0,
+      altaPrioridade: itens.filter(
+        (item) => item.risco === 'VERMELHO' || item.risco === 'LARANJA',
+      ).length,
+      semTriagem: itens.filter((item) => item.risco === null).length,
+    },
     total: itens.length,
     pagina: 1,
     porPagina: 10,
@@ -73,17 +88,23 @@ function renderQueue() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={auth}>
-        <MemoryRouter initialEntries={['/fila']}>
-          <Routes>
-            <Route path="/fila" element={<QueuePage />} />
-            <Route
-              path="/atendimentos/:id/sala"
-              element={<p>Sala profissional carregada</p>}
-            />
-          </Routes>
-        </MemoryRouter>
-      </AuthContext.Provider>
+      <ToastProvider>
+        <AuthContext.Provider value={auth}>
+          <MemoryRouter initialEntries={['/fila']}>
+            <Routes>
+              <Route path="/fila" element={<QueuePage />} />
+              <Route
+                path="/pacientes/:id"
+                element={<p>Ficha do paciente carregada</p>}
+              />
+              <Route
+                path="/atendimentos/:id/sala"
+                element={<p>Sala profissional carregada</p>}
+              />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </ToastProvider>
     </QueryClientProvider>,
   )
 }
@@ -159,7 +180,8 @@ describe('QueuePage', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Cadastrar paciente' }),
     )
-    const panel = screen.getByRole('region', { name: 'Cadastrar paciente' })
+    // O cadastro virou um <dialog> modal, então o papel acessível é "dialog".
+    const panel = screen.getByRole('dialog', { name: 'Cadastrar paciente' })
     await user.type(
       within(panel).getByLabelText('Nome completo'),
       'Maria da Silva',
@@ -174,13 +196,50 @@ describe('QueuePage', () => {
       within(panel).getByRole('button', { name: 'Cadastrar paciente' }),
     )
 
-    await screen.findByText('Paciente cadastrado')
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Cadastro de Maria da Silva concluído',
-    )
+    expect(await screen.findByText('Paciente cadastrado')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        /Maria da Silva entrou na fila e aguarda o início do atendimento/,
+      ),
+    ).toBeInTheDocument()
     expect(
       screen.queryByText('Sala profissional carregada'),
     ).not.toBeInTheDocument()
+  })
+
+  it('filtra a fila pelos casos de alta prioridade ao clicar no card', async () => {
+    const user = userEvent.setup()
+    mockedListQueue.mockResolvedValue(queueResponse([waitingAttendance]))
+    renderQueue()
+
+    // O card de métrica é o caminho que a equipe usa para responder "quem são
+    // os urgentes de hoje?" — antes o número não levava a lugar nenhum.
+    await user.click(
+      await screen.findByRole('button', { name: /Alta prioridade/ }),
+    )
+
+    expect(mockedListQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: ['AGUARDANDO', 'EM_ANDAMENTO'],
+        risco: ['VERMELHO', 'LARANJA'],
+        pagina: 1,
+      }),
+    )
+  })
+
+  it('leva ao histórico do paciente pelo nome na fila', async () => {
+    const user = userEvent.setup()
+    mockedListQueue.mockResolvedValue(queueResponse([waitingAttendance]))
+    renderQueue()
+
+    const patientLinks = await screen.findAllByRole('link', {
+      name: 'Maria da Silva',
+    })
+    await user.click(patientLinks[0])
+
+    expect(
+      await screen.findByText('Ficha do paciente carregada'),
+    ).toBeInTheDocument()
   })
 
   it('mostra uma falha de carregamento e permite tentar novamente', async () => {
@@ -276,7 +335,7 @@ describe('QueuePage', () => {
     expect(
       screen.getByRole('button', { name: 'Cadastrar paciente' }),
     ).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: 'Ver atendimento' }))
+    await user.click(screen.getByRole('button', { name: 'Retomar atendimento' }))
 
     expect(
       await screen.findByText('Sala profissional carregada'),

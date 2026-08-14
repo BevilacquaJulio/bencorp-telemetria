@@ -8,8 +8,16 @@ import type {
 } from './atendimentos.types'
 
 export async function listQueue(filters: QueueFilters) {
+  // Arrays viram lista separada por vírgula (`status=AGUARDANDO,EM_ANDAMENTO`),
+  // que é o formato que `listarFilaSchema` desserializa. Sem isso, o axios
+  // mandaria `status[]=` repetido e o Zod recusaria.
   const params = Object.fromEntries(
-    Object.entries(filters).filter(([, value]) => value !== undefined),
+    Object.entries(filters)
+      .filter(([, value]) => value !== undefined && value !== '')
+      .map(([key, value]) => [
+        key,
+        Array.isArray(value) ? value.join(',') : value,
+      ]),
   )
   const { data } = await api.get<QueueResponse>('/atendimentos', { params })
   return data

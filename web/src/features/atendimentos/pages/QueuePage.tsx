@@ -1,67 +1,89 @@
 import {
   ArrowRightIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  FunnelIcon,
-  MagnifyingGlassIcon,
-  PlayIcon,
+  BroomIcon,
+  CalendarBlankIcon,
   StethoscopeIcon,
   UserPlusIcon,
-  UsersThreeIcon,
-  WarningCircleIcon,
 } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
-import {
-  EmptyState,
-  ErrorState,
-  TableSkeleton,
-} from '../../../components/ui/DataState'
-import { RiskBadge, StatusBadge } from '../../../components/ui/StatusBadge'
+import { EmptyState, ErrorState, TableSkeleton } from '../../../components/ui/DataState'
+import { FilterChips, type ActiveFilter } from '../../../components/ui/FilterChips'
+import { Pagination } from '../../../components/ui/Pagination'
+import { SearchInput } from '../../../components/ui/SearchInput'
+import { Select } from '../../../components/ui/Select'
+import { useToast } from '../../../components/ui/toast-context'
 import { getApiErrorMessage } from '../../../lib/api'
-import { formatCpf, formatDateTime, timeInQueue } from '../../../lib/format'
 import { useAuth } from '../../auth/auth-context'
 import { listQueue, startAttendance } from '../atendimentos.api'
-import { PatientIntakePanel } from '../components/PatientIntakePanel'
 import type {
   AttendanceListItem,
   QueueFilters,
-  StatusAtendimento,
+  QueueSummary,
 } from '../atendimentos.types'
+import { PatientIntakePanel } from '../components/PatientIntakePanel'
+import { QueueCards } from '../components/QueueCards'
+import { QueueMetrics } from '../components/QueueMetrics'
+import { QueueTable } from '../components/QueueTable'
+import {
+  periodLabels,
+  scopeLabels,
+  scopeToFilters,
+  type QueueScope,
+} from '../queue-helpers'
 
-const statusOptions: Array<{ value: StatusAtendimento | ''; label: string }> = [
-  { value: '', label: 'Todos os status' },
-  { value: 'AGUARDANDO', label: 'Aguardando' },
-  { value: 'EM_ANDAMENTO', label: 'Em atendimento' },
-  { value: 'FINALIZADO', label: 'Finalizado' },
-  { value: 'CANCELADO', label: 'Cancelado' },
-]
+const PER_PAGE = 10
+
+const emptySummary: QueueSummary = {
+  totalPeriodo: 0,
+  aguardando: 0,
+  emAndamento: 0,
+  finalizados: 0,
+  cancelados: 0,
+  altaPrioridade: 0,
+  semTriagem: 0,
+}
+
+const periodOptions = (
+  Object.keys(periodLabels) as Array<QueueFilters['periodo']>
+).map((value) => ({ value, label: periodLabels[value] }))
+
+const scopeOptions = (Object.keys(scopeLabels) as QueueScope[]).map((value) => ({
+  value,
+  label: scopeLabels[value],
+}))
 
 export function QueuePage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { notify } = useToast()
+
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
-  const [status, setStatus] = useState<StatusAtendimento | ''>('')
+  const [scope, setScope] = useState<QueueScope>('todos')
   const [period, setPeriod] = useState<QueueFilters['periodo']>('hoje')
   const [page, setPage] = useState(1)
-  const [registeringPatient, setRegisteringPatient] = useState(false)
-  const [registeredPatientName, setRegisteredPatientName] = useState('')
+  const [intakeOpen, setIntakeOpen] = useState(false)
 
   const filters: QueueFilters = {
     busca: deferredSearch.trim() || undefined,
-    status: status || undefined,
+    ...scopeToFilters(scope),
     periodo: period,
     pagina: page,
-    porPagina: 10,
+    porPagina: PER_PAGE,
   }
 
   const queue = useQuery({
     queryKey: ['queue', filters],
     queryFn: () => listQueue(filters),
+    // Fila é dado que envelhece rápido: outro profissional pode assumir um
+    // paciente enquanto esta aba está aberta.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   })
 
   const startMutation = useMutation({
@@ -73,12 +95,13 @@ export function QueuePage() {
   })
 
   const items = queue.data?.itens ?? []
+  const summary = queue.data?.resumo ?? emptySummary
   const activeAttendance = queue.data?.atendimentoAtivo ?? null
-  const waiting = items.filter((item) => item.status === 'AGUARDANDO').length
-  const active = activeAttendance ? 1 : 0
-  const priority = items.filter(
-    (item) => item.risco === 'VERMELHO' || item.risco === 'LARANJA',
-  ).length
+
+  function changeFilter(apply: () => void) {
+    apply()
+    setPage(1)
+  }
 
   function handleAction(item: AttendanceListItem) {
     if (item.status === 'AGUARDANDO') {
@@ -92,354 +115,211 @@ export function QueuePage() {
     navigate(`/pacientes/${item.paciente.id}`)
   }
 
-  function actionLabel(statusValue: StatusAtendimento) {
-    if (statusValue === 'AGUARDANDO') return 'Iniciar atendimento'
-    if (statusValue === 'EM_ANDAMENTO') return 'Ver atendimento'
-    return 'Ver detalhes'
+  const activeFilters: ActiveFilter[] = [
+    scope !== 'todos'
+      ? {
+          id: 'scope',
+          label: 'Recorte',
+          value: scopeLabels[scope],
+          onRemove: () => changeFilter(() => setScope('todos')),
+        }
+      : null,
+    period !== 'todos'
+      ? {
+          id: 'period',
+          label: 'Período',
+          value: periodLabels[period],
+          onRemove: () => changeFilter(() => setPeriod('todos')),
+        }
+      : null,
+    search
+      ? {
+          id: 'search',
+          label: 'Busca',
+          value: search,
+          onRemove: () => changeFilter(() => setSearch('')),
+        }
+      : null,
+  ].filter((filter): filter is ActiveFilter => filter !== null)
+
+  function clearAllFilters() {
+    setScope('todos')
+    setPeriod('todos')
+    setSearch('')
+    setPage(1)
   }
 
   return (
     <div className="page-stack">
       <header className="page-heading page-enter">
         <div>
-          <p className="page-heading__context">Operação assistencial</p>
+          <p className="page-heading__eyebrow">Operação assistencial</p>
           <h1>Fila de atendimentos</h1>
-          <p>Acompanhe a demanda e conduza cada paciente com segurança.</p>
+          <p className="page-heading__lead">
+            Acompanhe a demanda do turno e conduza cada paciente com segurança.
+          </p>
         </div>
-        <div className="page-heading__actions">
-          <div className="page-heading__date">
-            <ClockIcon size={18} />
-            Atualização em tempo real
-          </div>
-          {user?.papel === 'ENFERMEIRO' ? (
+        {user?.papel === 'ENFERMEIRO' ? (
+          <div className="page-heading__actions">
             <Button
               type="button"
-              icon={<UserPlusIcon size={18} weight="bold" />}
-              onClick={() => {
-                setRegisteredPatientName('')
-                setRegisteringPatient(true)
-              }}
+              icon={<UserPlusIcon size={17} weight="bold" />}
+              onClick={() => setIntakeOpen(true)}
             >
               Cadastrar paciente
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </header>
 
-      {registeringPatient ? (
-        <PatientIntakePanel
-          onClose={() => setRegisteringPatient(false)}
-          onCreated={(attendance) => {
-            setRegisteringPatient(false)
-            setRegisteredPatientName(attendance.paciente.nome)
-            setStatus('')
-            setPeriod('hoje')
-            setPage(1)
-          }}
-        />
-      ) : null}
-
-      {registeredPatientName ? (
-        <section className="registration-success" role="status">
-          <CheckCircleIcon size={22} weight="fill" aria-hidden="true" />
-          <div>
-            <strong>Paciente cadastrado</strong>
-            <span>
-              Cadastro de {registeredPatientName} concluído. A pessoa foi
-              incluída na fila e aguarda o início do atendimento.
-            </span>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="metrics-grid" aria-label="Resumo da fila">
-        <article className="metric metric--primary page-enter page-enter--1">
-          <span className="metric__icon" aria-hidden="true">
-            <UsersThreeIcon size={24} weight="duotone" />
-          </span>
-          <div>
-            <p>No período selecionado</p>
-            <strong>{queue.data?.total ?? 0}</strong>
-            <span>atendimentos no período</span>
-          </div>
-        </article>
-        <article className="metric page-enter page-enter--2">
-          <span className="metric__label">Em espera</span>
-          <strong>{waiting}</strong>
-          <small>Aguardando acolhimento</small>
-        </article>
-        <article className="metric page-enter page-enter--3">
-          <span className="metric__label">Com você</span>
-          <strong>{active}</strong>
-          <small>Em atendimento agora</small>
-        </article>
-        <article className="metric metric--attention page-enter page-enter--4">
-          <span className="metric__label">Alta prioridade</span>
-          <strong>{priority}</strong>
-          <small>Vermelho ou laranja</small>
-        </article>
-      </section>
+      <QueueMetrics
+        summary={summary}
+        activeScope={scope}
+        onSelectScope={(next) => changeFilter(() => setScope(next))}
+      />
 
       {activeAttendance ? (
-        <section className="active-attendance-banner page-enter" role="status">
-          <span aria-hidden="true">
-            <StethoscopeIcon size={24} weight="duotone" />
+        <section className="active-banner page-enter" aria-label="Atendimento em andamento">
+          <span className="active-banner__icon" aria-hidden="true">
+            <StethoscopeIcon size={23} weight="duotone" />
           </span>
-          <div>
+          <div className="active-banner__content">
             <p>Atendimento em andamento</p>
             <strong>{activeAttendance.paciente.nome}</strong>
             <small>
-              Esta ficha permanece disponível independentemente do período
-              selecionado.
+              Esta ficha continua acessível mesmo fora do período selecionado.
             </small>
           </div>
           <Button
             type="button"
-            size="sm"
-            icon={<ArrowRightIcon size={17} />}
-            onClick={() =>
-              navigate(`/atendimentos/${activeAttendance.id}/sala`)
-            }
+            variant="accent"
+            trailingIcon={<ArrowRightIcon size={15} weight="bold" />}
+            onClick={() => navigate(`/atendimentos/${activeAttendance.id}/sala`)}
           >
-            Ver atendimento
+            Retomar atendimento
           </Button>
         </section>
       ) : null}
 
       <section className="panel queue-panel page-enter page-enter--2">
-        <div className="filter-bar">
-          <div className="search-control">
-            <MagnifyingGlassIcon size={19} aria-hidden="true" />
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                setPage(1)
-              }}
-              placeholder="Buscar por nome ou CPF"
-              aria-label="Buscar atendimento"
-            />
-          </div>
-          <div className="filter-selects">
-            <label>
-              <span className="sr-only">Filtrar por status</span>
-              <select
-                value={status}
-                onChange={(event) => {
-                  setStatus(event.target.value as StatusAtendimento | '')
-                  setPage(1)
-                }}
-              >
-                {statusOptions.map((option) => (
-                  <option value={option.value} key={option.value || 'all'}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span className="sr-only">Filtrar por período</span>
-              <select
-                value={period}
-                onChange={(event) => {
-                  setPeriod(event.target.value as QueueFilters['periodo'])
-                  setPage(1)
-                }}
-              >
-                <option value="hoje">Hoje</option>
-                <option value="ontem">Ontem</option>
-                <option value="ultima_semana">Últimos 7 dias</option>
-                <option value="todos">Todo o período</option>
-              </select>
-            </label>
-            <span className="filter-icon" aria-hidden="true">
-              <FunnelIcon size={18} />
-            </span>
-          </div>
+        <div className="toolbar">
+          <SearchInput
+            label="Buscar atendimento"
+            placeholder="Buscar por nome ou CPF"
+            value={search}
+            onChange={(value) => changeFilter(() => setSearch(value))}
+          />
+          <Select
+            label="Filtrar por situação"
+            hideLabel
+            size="sm"
+            value={scope}
+            options={scopeOptions}
+            onChange={(value) => changeFilter(() => setScope(value))}
+          />
+          <Select
+            label="Filtrar por período"
+            hideLabel
+            size="sm"
+            value={period}
+            options={periodOptions}
+            icon={<CalendarBlankIcon size={15} />}
+            onChange={(value) => changeFilter(() => setPeriod(value))}
+          />
         </div>
 
+        <FilterChips filters={activeFilters} onClearAll={clearAllFilters} />
+
         {startMutation.isError ? (
-          <div className="inline-alert" role="alert">
-            <WarningCircleIcon size={19} />
-            {getApiErrorMessage(startMutation.error)}
+          <div className="panel__body">
+            <Alert tone="error" title="Não foi possível iniciar">
+              {getApiErrorMessage(startMutation.error)}
+            </Alert>
           </div>
         ) : null}
 
-        {queue.isLoading ? <TableSkeleton rows={6} /> : null}
+        {queue.isLoading ? (
+          <div className="panel__body">
+            <TableSkeleton rows={6} />
+          </div>
+        ) : null}
+
         {queue.isError ? (
           <ErrorState
             message={getApiErrorMessage(queue.error)}
             onRetry={() => void queue.refetch()}
           />
         ) : null}
+
         {queue.isSuccess && items.length === 0 ? (
           <EmptyState
             title="Nenhum atendimento encontrado"
-            description="Ajuste os filtros ou aguarde a entrada de novos pacientes."
+            description={
+              activeFilters.length > 0
+                ? 'Os filtros ativos podem estar escondendo pacientes na fila.'
+                : 'Nenhuma pessoa aguardando neste período.'
+            }
+            action={
+              activeFilters.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={<BroomIcon size={16} />}
+                  onClick={clearAllFilters}
+                >
+                  Limpar filtros
+                </Button>
+              ) : null
+            }
           />
         ) : null}
 
         {queue.isSuccess && items.length > 0 ? (
           <>
-            <div className="desktop-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Paciente</th>
-                    <th>Contato</th>
-                    <th>Classificação de risco</th>
-                    <th>Status</th>
-                    <th>Entrada na fila</th>
-                    <th>Tempo de espera</th>
-                    <th aria-label="Ações" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <div className="patient-cell">
-                          <span>{item.paciente.nome.slice(0, 1)}</span>
-                          <div>
-                            <strong>{item.paciente.nome}</strong>
-                            <small>{formatCpf(item.paciente.cpf)}</small>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="queue-contact">
-                          {item.paciente.contato}
-                        </span>
-                      </td>
-                      <td>
-                        <RiskBadge risk={item.risco} />
-                      </td>
-                      <td>
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td>
-                        <span className="queue-entry-date">
-                          {formatDateTime(item.entradaFila)}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="queue-time">
-                          <ClockIcon size={16} />
-                          {timeInQueue(item.entradaFila)}
-                        </span>
-                      </td>
-                      <td>
-                        <Button
-                          type="button"
-                          variant={
-                            item.status === 'AGUARDANDO' ? 'primary' : 'ghost'
-                          }
-                          size="sm"
-                          loading={
-                            startMutation.isPending &&
-                            startMutation.variables === item.id
-                          }
-                          icon={
-                            item.status === 'AGUARDANDO' ? (
-                              <PlayIcon size={16} weight="fill" />
-                            ) : (
-                              <ArrowRightIcon size={16} />
-                            )
-                          }
-                          onClick={() => handleAction(item)}
-                        >
-                          {actionLabel(item.status)}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mobile-list">
-              {items.map((item) => (
-                <article className="attendance-card" key={item.id}>
-                  <div className="attendance-card__top">
-                    <div className="patient-cell">
-                      <span>{item.paciente.nome.slice(0, 1)}</span>
-                      <div>
-                        <strong>{item.paciente.nome}</strong>
-                        <small>{formatCpf(item.paciente.cpf)}</small>
-                      </div>
-                    </div>
-                    <StatusBadge status={item.status} />
-                  </div>
-                  <dl className="attendance-card__facts">
-                    <div>
-                      <dt>Contato</dt>
-                      <dd>{item.paciente.contato}</dd>
-                    </div>
-                    <div>
-                      <dt>Entrada na fila</dt>
-                      <dd>{formatDateTime(item.entradaFila)}</dd>
-                    </div>
-                  </dl>
-                  <div className="attendance-card__meta">
-                    <RiskBadge risk={item.risco} />
-                    <span className="queue-time">
-                      <ClockIcon size={16} />
-                      {timeInQueue(item.entradaFila)}
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant={
-                      item.status === 'AGUARDANDO' ? 'primary' : 'secondary'
-                    }
-                    size="sm"
-                    loading={
-                      startMutation.isPending &&
-                      startMutation.variables === item.id
-                    }
-                    icon={<StethoscopeIcon size={17} />}
-                    onClick={() => handleAction(item)}
-                  >
-                    {actionLabel(item.status)}
-                  </Button>
-                </article>
-              ))}
-            </div>
-
-            <footer className="panel-pagination">
-              <span>
-                Página {queue.data.pagina} de {Math.max(queue.data.paginas, 1)}
-              </span>
-              <div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((current) => current - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={page >= queue.data.paginas}
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  Próxima
-                </Button>
-              </div>
-            </footer>
+            <QueueTable
+              items={items}
+              pendingId={
+                startMutation.isPending ? startMutation.variables : undefined
+              }
+              onAction={handleAction}
+            />
+            <QueueCards
+              items={items}
+              pendingId={
+                startMutation.isPending ? startMutation.variables : undefined
+              }
+              onAction={handleAction}
+            />
+            <Pagination
+              page={queue.data.pagina}
+              totalPages={queue.data.paginas}
+              totalItems={queue.data.total}
+              itemLabel="no filtro atual"
+              onChange={setPage}
+            />
           </>
         ) : null}
       </section>
 
-      <p className="page-footnote">
-        <StethoscopeIcon size={17} />
+      <p className="page-note">
+        <StethoscopeIcon size={15} aria-hidden="true" />
         Perfil ativo: {user?.papel === 'MEDICO' ? 'Medicina' : 'Enfermagem'}
       </p>
+
+      <PatientIntakePanel
+        open={intakeOpen}
+        onClose={() => setIntakeOpen(false)}
+        onCreated={(attendance) => {
+          setIntakeOpen(false)
+          clearAllFilters()
+          notify({
+            tone: 'success',
+            title: 'Paciente cadastrado',
+            description: `${attendance.paciente.nome} entrou na fila e aguarda o início do atendimento.`,
+          })
+        }}
+      />
     </div>
   )
 }
