@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, StatusAtendimento } from '../../generated/prisma/client';
+import {
+  Papel,
+  Prisma,
+  StatusAtendimento,
+} from '../../generated/prisma/client';
+import type { UsuarioAutenticado } from '../common/auth/tipos';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { ListarFilaDto } from './dto/listar-fila.schema';
+import type { CriarAtendimentoDto } from './dto/criar-atendimento.schema';
+import type { CriarTriagemDto } from './dto/criar-triagem.schema';
+import type { ListarFilaDto } from './dto/listar-fila.schema';
 
 // O repository isola o acesso ao Prisma. Ele existe sobretudo por causa do
 // `assumirSeAindaEstiverNaFila` lá embaixo: é a consulta mais delicada do
@@ -10,10 +17,43 @@ import { ListarFilaDto } from './dto/listar-fila.schema';
 export class AtendimentoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listarFila(filtros: ListarFilaDto) {
-    const where: Prisma.AtendimentoWhereInput = {
+  async listarFila(filtros: ListarFilaDto, usuario: UsuarioAutenticado) {
+    const cpfBusca = filtros.busca?.replace(/\D/g, '');
+    const filtrosAplicados: Prisma.AtendimentoWhereInput = {
       ...(filtros.status ? { status: filtros.status } : {}),
       ...(filtros.risco ? { risco: filtros.risco } : {}),
+      ...this.filtroPeriodo(filtros.periodo),
+      ...(filtros.busca
+        ? {
+            paciente: {
+              OR: [
+                {
+                  nome: {
+                    contains: filtros.busca,
+                    mode: Prisma.QueryMode.insensitive,
+                  },
+                },
+                ...(cpfBusca ? [{ cpf: { contains: cpfBusca } }] : []),
+              ],
+            },
+          }
+        : {}),
+    };
+
+    // A fila sem dono é compartilhada; depois que alguém assume, somente o
+    // profissional vinculado continua vendo o item. Encaminhamentos criam uma
+    // nova espera com encaminhadoDeId e são destinados apenas aos médicos.
+    const aguardandoVisivel: Prisma.AtendimentoWhereInput = {
+      status: StatusAtendimento.AGUARDANDO,
+      ...(usuario.papel === Papel.ENFERMEIRO ? { encaminhadoDeId: null } : {}),
+    };
+    const where: Prisma.AtendimentoWhereInput = {
+      AND: [
+        filtrosAplicados,
+        {
+          OR: [aguardandoVisivel, { profissionalId: usuario.id }],
+        },
+      ],
     };
 
     // A ordenação espelha o índice [status, entradaFila]: filtra por status,
@@ -32,14 +72,48 @@ export class AtendimentoRepository {
           risco: true,
           entradaFila: true,
           iniciadoEm: true,
-          paciente: { select: { id: true, nome: true } },
+          paciente: {
+            select: { id: true, nome: true, cpf: true, contato: true },
+          },
           profissional: { select: { id: true, nome: true } },
+          encaminhadoDeId: true,
         },
       }),
       this.prisma.atendimento.count({ where }),
     ]);
 
     return { itens, total };
+  }
+
+  async pacienteExiste(pacienteId: string): Promise<boolean> {
+    const paciente = await this.prisma.paciente.findUnique({
+      where: { id: pacienteId },
+      select: { id: true },
+    });
+    return paciente !== null;
+  }
+
+  async criar(dto: CriarAtendimentoDto): Promise<string> {
+    const criado = await this.prisma.atendimento.create({
+      data: { pacienteId: dto.pacienteId },
+      select: { id: true },
+    });
+    return criado.id;
+  }
+
+  async prontuarioExiste(atendimentoId: string): Promise<boolean> {
+    const prontuario = await this.prisma.prontuario.findUnique({
+      where: { atendimentoId },
+      select: { id: true },
+    });
+    return prontuario !== null;
+  }
+
+  async contextoParaInicio(id: string) {
+    return this.prisma.atendimento.findUnique({
+      where: { id },
+      select: { status: true, encaminhadoDeId: true },
+    });
   }
 
   /**
@@ -88,6 +162,138 @@ export class AtendimentoRepository {
     return count;
   }
 
+  async finalizarSeEmAndamento(
+    id: string,
+    profissionalId: string,
+  ): Promise<number> {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.atendimento.updateMany({
+        where: {
+          id,
+          profissionalId,
+          status: StatusAtendimento.EM_ANDAMENTO,
+        },
+        data: {
+          status: StatusAtendimento.FINALIZADO,
+          finalizadoEm: agora,
+        },
+      });
+      if (count === 0) {
+        return 0;
+      }
+
+      // Marcar o prontuário e revogar os tokens pertencem à mesma mudança de
+      // estado. Se uma das escritas falhar, nenhuma delas pode ficar pela metade.
+      await tx.prontuario.updateMany({
+        where: { atendimentoId: id, finalizadoEm: null },
+        data: { finalizadoEm: agora },
+      });
+      await tx.salaToken.updateMany({
+        where: { atendimentoId: id, revogadoEm: null },
+        data: { revogadoEm: agora },
+      });
+
+      return count;
+    });
+  }
+
+  async cancelarSeAguardando(id: string): Promise<number> {
+    const { count } = await this.prisma.atendimento.updateMany({
+      where: { id, status: StatusAtendimento.AGUARDANDO },
+      data: {
+        status: StatusAtendimento.CANCELADO,
+        canceladoEm: new Date(),
+      },
+    });
+    return count;
+  }
+
+  async encaminharSeEmAndamento(
+    id: string,
+    profissionalId: string,
+  ): Promise<string | null> {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const origem = await tx.atendimento.findUnique({
+        where: { id },
+        select: { pacienteId: true, risco: true },
+      });
+      if (!origem) {
+        return null;
+      }
+
+      const { count } = await tx.atendimento.updateMany({
+        where: {
+          id,
+          profissionalId,
+          status: StatusAtendimento.EM_ANDAMENTO,
+        },
+        data: {
+          status: StatusAtendimento.FINALIZADO,
+          finalizadoEm: agora,
+        },
+      });
+      if (count === 0) {
+        return null;
+      }
+
+      await tx.prontuario.updateMany({
+        where: { atendimentoId: id, finalizadoEm: null },
+        data: { finalizadoEm: agora },
+      });
+      await tx.salaToken.updateMany({
+        where: { atendimentoId: id, revogadoEm: null },
+        data: { revogadoEm: agora },
+      });
+
+      // Encaminhar cria outro atendimento em vez de trocar o profissional do
+      // atual. Assim o histórico da etapa de enfermagem permanece íntegro.
+      const encaminhado = await tx.atendimento.create({
+        data: {
+          pacienteId: origem.pacienteId,
+          risco: origem.risco,
+          encaminhadoDeId: id,
+        },
+        select: { id: true },
+      });
+      return encaminhado.id;
+    });
+  }
+
+  async criarTriagem(
+    atendimentoId: string,
+    autorId: string,
+    dto: CriarTriagemDto,
+  ): Promise<number> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.atendimento.updateMany({
+        where: {
+          id: atendimentoId,
+          profissionalId: autorId,
+          status: StatusAtendimento.EM_ANDAMENTO,
+        },
+        data: { risco: dto.risco },
+      });
+      if (count === 0) {
+        return 0;
+      }
+
+      await tx.triagem.create({
+        data: {
+          atendimentoId,
+          autorId,
+          queixa: dto.queixa,
+          pa: dto.pa,
+          fc: dto.fc,
+          temperatura: dto.temperatura,
+          satO2: dto.satO2,
+        },
+      });
+      return count;
+    });
+  }
+
   async statusAtual(id: string): Promise<StatusAtendimento | null> {
     const atendimento = await this.prisma.atendimento.findUnique({
       where: { id },
@@ -109,7 +315,13 @@ export class AtendimentoRepository {
         finalizadoEm: true,
         canceladoEm: true,
         paciente: {
-          select: { id: true, nome: true, cpf: true, nascimento: true },
+          select: {
+            id: true,
+            nome: true,
+            cpf: true,
+            contato: true,
+            nascimento: true,
+          },
         },
         profissional: { select: { id: true, nome: true, papel: true } },
         triagem: {
@@ -122,7 +334,48 @@ export class AtendimentoRepository {
             criadoEm: true,
           },
         },
+        encaminhadoDe: {
+          select: {
+            id: true,
+            profissional: { select: { id: true, nome: true } },
+            triagem: {
+              select: {
+                queixa: true,
+                pa: true,
+                fc: true,
+                temperatura: true,
+                satO2: true,
+                criadoEm: true,
+              },
+            },
+          },
+        },
       },
     });
+  }
+
+  private filtroPeriodo(
+    periodo: ListarFilaDto['periodo'],
+  ): Prisma.AtendimentoWhereInput {
+    if (periodo === 'todos') {
+      return {};
+    }
+
+    const inicioHoje = new Date();
+    inicioHoje.setHours(0, 0, 0, 0);
+
+    if (periodo === 'hoje') {
+      return { entradaFila: { gte: inicioHoje } };
+    }
+
+    if (periodo === 'ontem') {
+      const inicioOntem = new Date(inicioHoje);
+      inicioOntem.setDate(inicioOntem.getDate() - 1);
+      return { entradaFila: { gte: inicioOntem, lt: inicioHoje } };
+    }
+
+    const inicioSemana = new Date(inicioHoje);
+    inicioSemana.setDate(inicioSemana.getDate() - 7);
+    return { entradaFila: { gte: inicioSemana } };
   }
 }

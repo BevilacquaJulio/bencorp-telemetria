@@ -3,8 +3,10 @@ import { Risco, StatusAtendimento } from '../../../generated/prisma/client';
 
 // Query string chega sempre como texto, então os números vêm com coerce.
 export const listarFilaSchema = z.object({
+  busca: z.string().trim().min(1).max(160).optional(),
   status: z.enum(StatusAtendimento).optional(),
   risco: z.enum(Risco).optional(),
+  periodo: z.enum(['hoje', 'ontem', 'ultima_semana', 'todos']).default('todos'),
   pagina: z.coerce.number().int().min(1).default(1),
   porPagina: z.coerce.number().int().min(1).max(100).default(20),
 });
