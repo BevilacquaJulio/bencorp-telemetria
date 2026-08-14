@@ -33,7 +33,7 @@ export function PatientsPage() {
     <div className="page-stack">
       <header className="page-heading page-enter">
         <div>
-          <p className="page-heading__context">Histórico assistencial</p>
+          <p className="page-heading__context">Cadastro assistencial</p>
           <h1>Pacientes</h1>
           <p>Consulte dados e atendimentos dentro do seu escopo de atuação.</p>
         </div>
@@ -118,7 +118,7 @@ export function PatientsPage() {
                       icon={<ArrowRightIcon size={16} />}
                       onClick={() => navigate(`/pacientes/${patient.id}`)}
                     >
-                      Ver histórico
+                      Ver detalhes
                     </Button>
                   </div>
                 </article>
