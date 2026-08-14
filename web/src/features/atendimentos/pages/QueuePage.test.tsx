@@ -232,6 +232,24 @@ describe('QueuePage', () => {
     )
   })
 
+  it('permite filtrar a fila pelos atendimentos finalizados', async () => {
+    const user = userEvent.setup()
+    mockedListQueue.mockResolvedValue(queueResponse([]))
+    renderQueue()
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Filtrar por situação' }),
+    )
+    await user.click(screen.getByRole('option', { name: 'Finalizados' }))
+
+    expect(mockedListQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: ['FINALIZADO'],
+        pagina: 1,
+      }),
+    )
+  })
+
   it('leva ao histórico do paciente pelo nome na fila', async () => {
     const user = userEvent.setup()
     mockedListQueue.mockResolvedValue(queueResponse([waitingAttendance]))
