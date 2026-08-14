@@ -9,11 +9,13 @@ import { Avatar } from '../../../components/ui/Avatar'
 import { Button } from '../../../components/ui/Button'
 import { RiskBadge, StatusBadge } from '../../../components/ui/StatusBadge'
 import { formatCpf, formatDateTime, timeInQueue } from '../../../lib/format'
+import type { Papel } from '../../auth/auth.types'
 import type { AttendanceListItem } from '../atendimentos.types'
-import { primaryActionLabel, waitSeverity } from '../queue-helpers'
+import { canForwardToDoctor, primaryActionLabel, waitSeverity } from '../queue-helpers'
 
 type QueueTableProps = {
   items: AttendanceListItem[]
+  role: Papel
   pendingId?: string
   onAction: (item: AttendanceListItem) => void
 }
@@ -35,7 +37,7 @@ function WaitTime({ item }: { item: AttendanceListItem }) {
   )
 }
 
-export function QueueTable({ items, pendingId, onAction }: QueueTableProps) {
+export function QueueTable({ items, role, pendingId, onAction }: QueueTableProps) {
   return (
     <div className="data-table">
       <table>
@@ -93,7 +95,11 @@ export function QueueTable({ items, pendingId, onAction }: QueueTableProps) {
               <td>
                 <Button
                   type="button"
-                  variant={item.status === 'AGUARDANDO' ? 'primary' : 'secondary'}
+                  variant={
+                    item.status === 'AGUARDANDO' || canForwardToDoctor(item, role)
+                      ? 'primary'
+                      : 'secondary'
+                  }
                   size="sm"
                   loading={pendingId === item.id}
                   icon={
@@ -105,7 +111,7 @@ export function QueueTable({ items, pendingId, onAction }: QueueTableProps) {
                   }
                   onClick={() => onAction(item)}
                 >
-                  {primaryActionLabel(item.status)}
+                  {primaryActionLabel(item, role)}
                 </Button>
               </td>
             </tr>

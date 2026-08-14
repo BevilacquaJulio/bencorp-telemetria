@@ -29,6 +29,7 @@ const attendance: AttendanceDetail = {
   },
   profissional: null,
   encaminhadoDeId: null,
+  encaminhadoPara: null,
   triagem: null,
   encaminhadoDe: null,
 }

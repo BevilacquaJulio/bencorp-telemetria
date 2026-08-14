@@ -84,6 +84,7 @@ const attendance: AttendanceDetail = {
   },
   profissional: { id: 'enfermeiro-1', nome: 'Ana Ferreira' },
   encaminhadoDeId: null,
+  encaminhadoPara: null,
   triagem: null,
   encaminhadoDe: null,
 }

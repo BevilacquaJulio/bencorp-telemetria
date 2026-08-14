@@ -1,4 +1,10 @@
-import type { QueueFilters, Risco, StatusAtendimento } from './atendimentos.types'
+import type { Papel } from '../auth/auth.types'
+import type {
+  AttendanceListItem,
+  QueueFilters,
+  Risco,
+  StatusAtendimento,
+} from './atendimentos.types'
 
 /**
  * Recortes prontos que os cards de métrica aplicam na fila.
@@ -66,8 +72,25 @@ export function waitSeverity(
 }
 
 /** Ação principal disponível para o item, segundo o estado dele. */
-export function primaryActionLabel(status: StatusAtendimento): string {
-  if (status === 'AGUARDANDO') return 'Iniciar atendimento'
-  if (status === 'EM_ANDAMENTO') return 'Ver atendimento'
+export function canForwardToDoctor(
+  item: AttendanceListItem,
+  role: Papel,
+): boolean {
+  return (
+    role === 'ENFERMEIRO' &&
+    item.status === 'FINALIZADO' &&
+    item.risco !== null &&
+    item.encaminhadoDeId === null &&
+    item.encaminhadoPara === null
+  )
+}
+
+export function primaryActionLabel(
+  item: AttendanceListItem,
+  role: Papel,
+): string {
+  if (item.status === 'AGUARDANDO') return 'Iniciar atendimento'
+  if (item.status === 'EM_ANDAMENTO') return 'Ver atendimento'
+  if (canForwardToDoctor(item, role)) return 'Encaminhar para médico'
   return 'Ver detalhes'
 }

@@ -42,6 +42,7 @@ export type AttendanceListItem = {
   paciente: PatientSummary
   profissional: ProfessionalSummary | null
   encaminhadoDeId: string | null
+  encaminhadoPara: { id: string } | null
 }
 
 export type AttendanceDetail = AttendanceListItem & {

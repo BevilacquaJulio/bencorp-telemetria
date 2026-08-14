@@ -57,7 +57,7 @@ const endActionCopy: Record<
     consequences: [
       'A sala é encerrada e o convite do paciente deixa de funcionar.',
       'O atendimento sai da fila e passa a constar como finalizado.',
-      'Para uma nova avaliação será preciso abrir outro atendimento.',
+      'Se a triagem já foi registrada, ainda é possível encaminhar para o médico pela fila.',
     ],
   },
 }

@@ -9,11 +9,13 @@ import { Avatar } from '../../../components/ui/Avatar'
 import { Button } from '../../../components/ui/Button'
 import { RiskBadge, StatusBadge } from '../../../components/ui/StatusBadge'
 import { formatCpf, formatDateTime, timeInQueue } from '../../../lib/format'
+import type { Papel } from '../../auth/auth.types'
 import type { AttendanceListItem } from '../atendimentos.types'
-import { primaryActionLabel, waitSeverity } from '../queue-helpers'
+import { canForwardToDoctor, primaryActionLabel, waitSeverity } from '../queue-helpers'
 
 type QueueCardsProps = {
   items: AttendanceListItem[]
+  role: Papel
   pendingId?: string
   onAction: (item: AttendanceListItem) => void
 }
@@ -25,7 +27,7 @@ type QueueCardsProps = {
  * celular perde a associação entre cabeçalho e célula, e o leitor de tela
  * passa a anunciar valores sem dizer do que são.
  */
-export function QueueCards({ items, pendingId, onAction }: QueueCardsProps) {
+export function QueueCards({ items, role, pendingId, onAction }: QueueCardsProps) {
   return (
     <div className="queue-cards">
       {items.map((item) => {
@@ -79,7 +81,11 @@ export function QueueCards({ items, pendingId, onAction }: QueueCardsProps) {
             <div className="link-card__raised">
               <Button
                 type="button"
-                variant={item.status === 'AGUARDANDO' ? 'primary' : 'secondary'}
+                variant={
+                  item.status === 'AGUARDANDO' || canForwardToDoctor(item, role)
+                    ? 'primary'
+                    : 'secondary'
+                }
                 size="sm"
                 block
                 loading={pendingId === item.id}
@@ -92,7 +98,7 @@ export function QueueCards({ items, pendingId, onAction }: QueueCardsProps) {
                 }
                 onClick={() => onAction(item)}
               >
-                {primaryActionLabel(item.status)}
+                {primaryActionLabel(item, role)}
               </Button>
             </div>
           </article>

@@ -11,6 +11,7 @@ import {
   listQueue,
   registerPatient,
   startAttendance,
+  forwardAttendance,
 } from '../atendimentos.api'
 import type {
   AttendanceDetail,
@@ -23,11 +24,13 @@ vi.mock('../atendimentos.api', () => ({
   listQueue: vi.fn(),
   registerPatient: vi.fn(),
   startAttendance: vi.fn(),
+  forwardAttendance: vi.fn(),
 }))
 
 const mockedListQueue = vi.mocked(listQueue)
 const mockedRegisterPatient = vi.mocked(registerPatient)
 const mockedStartAttendance = vi.mocked(startAttendance)
+const mockedForwardAttendance = vi.mocked(forwardAttendance)
 
 const waitingAttendance: AttendanceListItem = {
   id: 'atendimento-1',
@@ -43,6 +46,7 @@ const waitingAttendance: AttendanceListItem = {
   },
   profissional: null,
   encaminhadoDeId: null,
+  encaminhadoPara: null,
 }
 
 function queueResponse(itens: AttendanceListItem[]): QueueResponse {
@@ -136,6 +140,7 @@ describe('QueuePage', () => {
     mockedListQueue.mockReset()
     mockedRegisterPatient.mockReset()
     mockedStartAttendance.mockReset()
+    mockedForwardAttendance.mockReset()
   })
 
   it('apresenta o estado vazio sem quebrar a navegação', async () => {
@@ -341,6 +346,41 @@ describe('QueuePage', () => {
       await screen.findByText('Sala profissional carregada'),
     ).toBeInTheDocument()
     expect(mockedStartAttendance).not.toHaveBeenCalled()
+  })
+
+  it('encaminha para o médico um atendimento já finalizado com triagem', async () => {
+    const user = userEvent.setup()
+    const finished: AttendanceListItem = {
+      ...waitingAttendance,
+      status: 'FINALIZADO',
+      profissional: { id: 'enfermeiro-1', nome: 'Ana Ferreira' },
+    }
+    mockedListQueue.mockResolvedValue(queueResponse([finished]))
+    mockedForwardAttendance.mockResolvedValue({
+      ...waitingAttendance,
+      id: 'atendimento-medico',
+      encaminhadoDeId: finished.id,
+      finalizadoEm: null,
+      canceladoEm: null,
+      triagem: null,
+      encaminhadoDe: null,
+    })
+    renderQueue()
+
+    const buttons = await screen.findAllByRole('button', {
+      name: 'Encaminhar para médico',
+    })
+    await user.click(buttons[0])
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Encaminhar para a fila médica?',
+    })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Encaminhar paciente' }),
+    )
+
+    expect(mockedForwardAttendance).toHaveBeenCalledWith('atendimento-1')
+    expect(await screen.findByText('Paciente encaminhado')).toBeInTheDocument()
   })
 
   it('exibe todas as colunas obrigatórias da fila de pronto atendimento', async () => {

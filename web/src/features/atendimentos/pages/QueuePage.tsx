@@ -10,6 +10,7 @@ import { useDeferredValue, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { EmptyState, ErrorState, TableSkeleton } from '../../../components/ui/DataState'
 import { FilterChips, type ActiveFilter } from '../../../components/ui/FilterChips'
 import { Pagination } from '../../../components/ui/Pagination'
@@ -18,7 +19,7 @@ import { Select } from '../../../components/ui/Select'
 import { useToast } from '../../../components/ui/toast-context'
 import { getApiErrorMessage } from '../../../lib/api'
 import { useAuth } from '../../auth/auth-context'
-import { listQueue, startAttendance } from '../atendimentos.api'
+import { listQueue, startAttendance, forwardAttendance } from '../atendimentos.api'
 import type {
   AttendanceListItem,
   QueueFilters,
@@ -29,6 +30,7 @@ import { QueueCards } from '../components/QueueCards'
 import { QueueMetrics } from '../components/QueueMetrics'
 import { QueueTable } from '../components/QueueTable'
 import {
+  canForwardToDoctor,
   periodLabels,
   scopeLabels,
   scopeToFilters,
@@ -68,6 +70,8 @@ export function QueuePage() {
   const [period, setPeriod] = useState<QueueFilters['periodo']>('hoje')
   const [page, setPage] = useState(1)
   const [intakeOpen, setIntakeOpen] = useState(false)
+  const [forwarding, setForwarding] = useState<AttendanceListItem | null>(null)
+  const role = user?.papel === 'MEDICO' ? 'MEDICO' : 'ENFERMEIRO'
 
   const filters: QueueFilters = {
     busca: deferredSearch.trim() || undefined,
@@ -94,6 +98,19 @@ export function QueuePage() {
     },
   })
 
+  const forwardMutation = useMutation({
+    mutationFn: (item: AttendanceListItem) => forwardAttendance(item.id),
+    onSuccess: (_created, item) => {
+      void queryClient.invalidateQueries({ queryKey: ['queue'] })
+      setForwarding(null)
+      notify({
+        tone: 'success',
+        title: 'Paciente encaminhado',
+        description: `${item.paciente.nome} entrou na fila médica.`,
+      })
+    },
+  })
+
   const items = queue.data?.itens ?? []
   const summary = queue.data?.resumo ?? emptySummary
   const activeAttendance = queue.data?.atendimentoAtivo ?? null
@@ -110,6 +127,10 @@ export function QueuePage() {
     }
     if (item.status === 'EM_ANDAMENTO') {
       navigate(`/atendimentos/${item.id}/sala`)
+      return
+    }
+    if (canForwardToDoctor(item, role)) {
+      setForwarding(item)
       return
     }
     navigate(`/pacientes/${item.paciente.id}`)
@@ -279,15 +300,25 @@ export function QueuePage() {
           <>
             <QueueTable
               items={items}
+              role={role}
               pendingId={
-                startMutation.isPending ? startMutation.variables : undefined
+                startMutation.isPending
+                  ? startMutation.variables
+                  : forwardMutation.isPending
+                    ? forwardMutation.variables?.id
+                    : undefined
               }
               onAction={handleAction}
             />
             <QueueCards
               items={items}
+              role={role}
               pendingId={
-                startMutation.isPending ? startMutation.variables : undefined
+                startMutation.isPending
+                  ? startMutation.variables
+                  : forwardMutation.isPending
+                    ? forwardMutation.variables?.id
+                    : undefined
               }
               onAction={handleAction}
             />
@@ -318,6 +349,33 @@ export function QueuePage() {
             title: 'Paciente cadastrado',
             description: `${attendance.paciente.nome} entrou na fila e aguarda o início do atendimento.`,
           })
+        }}
+      />
+
+      <ConfirmDialog
+        open={forwarding !== null}
+        eyebrow="Decisão assistencial"
+        title="Encaminhar para a fila médica?"
+        description="A etapa de enfermagem já foi encerrada. Uma nova ficha entra na fila do médico com a triagem já registrada."
+        consequences={[
+          'O atendimento de enfermagem permanece finalizado.',
+          'O paciente volta a aguardar — agora na fila médica.',
+          'A triagem segue visível para o médico que assumir.',
+        ]}
+        confirmLabel="Encaminhar paciente"
+        cancelLabel="Voltar"
+        tone="warning"
+        loading={forwardMutation.isPending}
+        error={
+          forwardMutation.isError ? (
+            <Alert tone="error" compact>
+              {getApiErrorMessage(forwardMutation.error)}
+            </Alert>
+          ) : null
+        }
+        onConfirm={() => forwarding && forwardMutation.mutate(forwarding)}
+        onCancel={() => {
+          if (!forwardMutation.isPending) setForwarding(null)
         }}
       />
     </div>
