@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   Papel,
   Prisma,
+  Risco,
   StatusAtendimento,
 } from '../../generated/prisma/client';
 import {
@@ -10,7 +11,10 @@ import {
   RecursoNaoEncontrado,
   TransicaoInvalida,
 } from '../common/erros/erros';
-import { AtendimentoRepository } from './atendimento.repository';
+import {
+  AtendimentoRepository,
+  type LinhaDistribuicaoFila,
+} from './atendimento.repository';
 import {
   explicarTransicao,
   transicaoPermitida,
@@ -25,6 +29,9 @@ import { SalaService } from '../sala/sala.service';
 /** Violação de restrição única no Postgres, na numeração do Prisma. */
 const P2002_UNICIDADE = 'P2002';
 
+/** Tabulação cruzada status × risco devolvida pelo repository. */
+type DistribuicaoFila = LinhaDistribuicaoFila[];
+
 @Injectable()
 export class AtendimentoService {
   private readonly logger = new Logger(AtendimentoService.name);
@@ -35,17 +42,57 @@ export class AtendimentoService {
   ) {}
 
   async listarFila(filtros: ListarFilaDto, usuario: UsuarioAutenticado) {
-    const { itens, total, atendimentoAtivo } = await this.repo.listarFila(
-      filtros,
-      usuario,
-    );
+    const { itens, total, atendimentoAtivo, distribuicao } =
+      await this.repo.listarFila(filtros, usuario);
     return {
       itens,
       total,
       atendimentoAtivo,
+      resumo: this.resumirFila(distribuicao),
       pagina: filtros.pagina,
       porPagina: filtros.porPagina,
       paginas: Math.ceil(total / filtros.porPagina),
+    };
+  }
+
+  /**
+   * Traduz a tabulação cruzada (status × risco) do banco nos números que a
+   * tela mostra. Fica aqui, e não no componente, porque "alta prioridade" é
+   * uma definição clínica — vermelho ou laranja **ainda em aberto** — e não
+   * uma soma qualquer que cada tela possa reinterpretar do seu jeito.
+   */
+  private resumirFila(distribuicao: DistribuicaoFila) {
+    const somar = (
+      predicado: (linha: DistribuicaoFila[number]) => boolean,
+    ): number =>
+      distribuicao.reduce(
+        (acumulado, linha) =>
+          predicado(linha) ? acumulado + linha.total : acumulado,
+        0,
+      );
+
+    const emAberto = (linha: DistribuicaoFila[number]) =>
+      linha.status === StatusAtendimento.AGUARDANDO ||
+      linha.status === StatusAtendimento.EM_ANDAMENTO;
+    const grave = (linha: DistribuicaoFila[number]) =>
+      linha.risco === Risco.VERMELHO || linha.risco === Risco.LARANJA;
+
+    return {
+      totalPeriodo: somar(() => true),
+      aguardando: somar(
+        (linha) => linha.status === StatusAtendimento.AGUARDANDO,
+      ),
+      emAndamento: somar(
+        (linha) => linha.status === StatusAtendimento.EM_ANDAMENTO,
+      ),
+      finalizados: somar(
+        (linha) => linha.status === StatusAtendimento.FINALIZADO,
+      ),
+      cancelados: somar(
+        (linha) => linha.status === StatusAtendimento.CANCELADO,
+      ),
+      altaPrioridade: somar((linha) => emAberto(linha) && grave(linha)),
+      semTriagem: somar((linha) => emAberto(linha) && linha.risco === null),
     };
   }
 

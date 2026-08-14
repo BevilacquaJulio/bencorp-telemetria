@@ -2,8 +2,16 @@ import { Injectable } from '@nestjs/common';
 import {
   Papel,
   Prisma,
+  Risco,
   StatusAtendimento,
 } from '../../generated/prisma/client';
+
+/** Quantos atendimentos existem em cada combinação de status e risco. */
+export type LinhaDistribuicaoFila = {
+  status: StatusAtendimento;
+  risco: Risco | null;
+  total: number;
+};
 import type { UsuarioAutenticado } from '../common/auth/tipos';
 import { PrismaService } from '../common/prisma/prisma.service';
 import type { CadastrarPacienteDto } from './dto/cadastrar-paciente.schema';
@@ -20,9 +28,11 @@ export class AtendimentoRepository {
 
   async listarFila(filtros: ListarFilaDto, usuario: UsuarioAutenticado) {
     const cpfBusca = filtros.busca?.replace(/\D/g, '');
-    const filtrosAplicados: Prisma.AtendimentoWhereInput = {
-      ...(filtros.status ? { status: filtros.status } : {}),
-      ...(filtros.risco ? { risco: filtros.risco } : {}),
+
+    // Recorte de contexto: o que o profissional escolheu *olhar* (período e
+    // busca). Fica separado do recorte de triagem (status e risco) porque o
+    // resumo precisa do primeiro sem o segundo — ver comentário abaixo.
+    const filtroContexto: Prisma.AtendimentoWhereInput = {
       ...this.filtroPeriodo(filtros.periodo),
       ...(filtros.busca
         ? {
@@ -40,6 +50,10 @@ export class AtendimentoRepository {
           }
         : {}),
     };
+    const filtroTriagem: Prisma.AtendimentoWhereInput = {
+      ...(filtros.status ? { status: { in: filtros.status } } : {}),
+      ...(filtros.risco ? { risco: { in: filtros.risco } } : {}),
+    };
 
     // A fila sem dono é compartilhada; depois que alguém assume, somente o
     // profissional vinculado continua vendo o item. Encaminhamentos criam uma
@@ -48,13 +62,18 @@ export class AtendimentoRepository {
       status: StatusAtendimento.AGUARDANDO,
       ...(usuario.papel === Papel.ENFERMEIRO ? { encaminhadoDeId: null } : {}),
     };
+    const escopoVisivel: Prisma.AtendimentoWhereInput = {
+      OR: [aguardandoVisivel, { profissionalId: usuario.id }],
+    };
     const where: Prisma.AtendimentoWhereInput = {
-      AND: [
-        filtrosAplicados,
-        {
-          OR: [aguardandoVisivel, { profissionalId: usuario.id }],
-        },
-      ],
+      AND: [filtroContexto, filtroTriagem, escopoVisivel],
+    };
+    // O resumo ignora status e risco de propósito. Ele é o painel que o
+    // profissional usa para *aplicar* esses filtros; se respeitasse o filtro
+    // ativo, clicar em "alta prioridade" zeraria todos os outros contadores e
+    // o painel deixaria de servir para navegar.
+    const whereResumo: Prisma.AtendimentoWhereInput = {
+      AND: [filtroContexto, escopoVisivel],
     };
 
     // A ordenação espelha o índice [status, entradaFila]: filtra por status,
@@ -74,29 +93,52 @@ export class AtendimentoRepository {
       encaminhadoDeId: true,
     } satisfies Prisma.AtendimentoSelect;
 
-    const [itens, total, atendimentoAtivo] = await this.prisma.$transaction([
-      this.prisma.atendimento.findMany({
-        where,
-        orderBy: { entradaFila: 'asc' },
-        skip: (filtros.pagina - 1) * filtros.porPagina,
-        take: filtros.porPagina,
-        select: itemSelect,
-      }),
-      this.prisma.atendimento.count({ where }),
-      // O vínculo ativo precisa aparecer mesmo quando a ficha entrou ontem e
-      // a fila está filtrada em "hoje". Sem este destaque independente, o
-      // profissional fica impedido pelo índice único sem enxergar o que deve
-      // retomar e finalizar.
-      this.prisma.atendimento.findFirst({
-        where: {
-          profissionalId: usuario.id,
-          status: StatusAtendimento.EM_ANDAMENTO,
-        },
-        select: itemSelect,
+    // Uma tabulação cruzada em vez de N counts: o serviço deriva qualquer
+    // combinação (aguardando, grave em aberto, etc.) sem ida extra ao banco, e
+    // os números param de depender da página exibida. Fica fora do
+    // `$transaction([...])` porque a tupla apaga a sobrecarga precisa do
+    // groupBy e obrigaria a um cast; é um agregado de painel, não precisa do
+    // mesmo snapshot da página.
+    const [[itens, total, atendimentoAtivo], distribuicao] = await Promise.all([
+      this.prisma.$transaction([
+        this.prisma.atendimento.findMany({
+          where,
+          orderBy: { entradaFila: 'asc' },
+          skip: (filtros.pagina - 1) * filtros.porPagina,
+          take: filtros.porPagina,
+          select: itemSelect,
+        }),
+        this.prisma.atendimento.count({ where }),
+        // O vínculo ativo precisa aparecer mesmo quando a ficha entrou ontem e
+        // a fila está filtrada em "hoje". Sem este destaque independente, o
+        // profissional fica impedido pelo índice único sem enxergar o que deve
+        // retomar e finalizar.
+        this.prisma.atendimento.findFirst({
+          where: {
+            profissionalId: usuario.id,
+            status: StatusAtendimento.EM_ANDAMENTO,
+          },
+          select: itemSelect,
+        }),
+      ]),
+      this.prisma.atendimento.groupBy({
+        by: ['status', 'risco'],
+        where: whereResumo,
+        orderBy: [{ status: 'asc' }],
+        _count: true,
       }),
     ]);
 
-    return { itens, total, atendimentoAtivo };
+    return {
+      itens,
+      total,
+      atendimentoAtivo,
+      distribuicao: distribuicao.map<LinhaDistribuicaoFila>((linha) => ({
+        status: linha.status,
+        risco: linha.risco,
+        total: linha._count,
+      })),
+    };
   }
 
   async pacienteExiste(pacienteId: string): Promise<boolean> {
