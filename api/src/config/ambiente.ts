@@ -33,6 +33,13 @@ export const ambienteSchema = z.object({
       (url) => /^(wss?|https?):\/\//.test(url),
       'use ws://, wss://, http:// ou https://',
     ),
+  LIVEKIT_PUBLIC_URL: z
+    .url('precisa ser uma URL válida')
+    .refine(
+      (url) => /^(wss?|https?):\/\//.test(url),
+      'use ws://, wss://, http:// ou https://',
+    )
+    .optional(),
   LIVEKIT_API_KEY: z.string().min(3, 'obrigatória'),
   LIVEKIT_API_SECRET: z.string().min(16, 'precisa de pelo menos 16 caracteres'),
 

@@ -1,9 +1,3 @@
-# PAD — Pronto Atendimento Digital
-#
-# Nesta etapa sobe apenas o banco. Os serviços api, web e livekit entram
-# quando existirem Dockerfiles, para que `docker compose up` nunca fique
-# quebrado no meio do caminho.
-
 services:
   db:
     image: postgres:16-alpine
@@ -14,17 +8,123 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      # Exposto para que o Prisma rode da máquina local durante o desenvolvimento.
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      # Sem isso a API sobe antes do banco aceitar conexão e falha na migration.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 12
       start_period: 5s
+    networks:
+      - pad-network
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 512m
+    cpus: 0.75
+
+  livekit:
+    image: livekit/livekit-server:v1.13.1
+    container_name: pad-livekit
+    restart: unless-stopped
+    command: ["--dev", "--bind", "0.0.0.0"]
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880"
+      - "${LIVEKIT_TCP_PORT:-7881}:7881"
+      - "${LIVEKIT_UDP_PORT:-7882}:7882/udp"
+    healthcheck:
+      test: ["CMD", "/livekit-server", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - pad-network
+    logging: *default-logging
+    mem_limit: 512m
+    cpus: 1.0
+
+  migrate:
+    image: pad-migrate
+    container_name: pad-migrate
+    build:
+      context: ./api
+      target: migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - pad-network
+    logging: *default-logging
+    mem_limit: 512m
+    cpus: 0.5
+
+  api:
+    image: pad-api
+    container_name: pad-api
+    build:
+      context: ./api
+      target: runtime
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      SALA_TOKEN_TTL_SEG: ${SALA_TOKEN_TTL_SEG:-900}
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      API_PORT: 3000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      NODE_ENV: production
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      livekit:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - pad-network
+    logging: *default-logging
+    mem_limit: 512m
+    cpus: 0.75
+
+  web:
+    image: pad-web
+    container_name: pad-web
+    build:
+      context: ./web
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - pad-network
+    logging: *default-logging
+    mem_limit: 128m
+    cpus: 0.25
+
+networks:
+  pad-network:
+    name: pad-network
+    driver: bridge
 
 volumes:
   pgdata:

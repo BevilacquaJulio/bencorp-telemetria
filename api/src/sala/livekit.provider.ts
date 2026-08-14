@@ -22,9 +22,10 @@ export class LiveKitProvider {
 
   constructor(config: ConfigService) {
     const url = config.getOrThrow<string>('LIVEKIT_URL');
+    const urlPublica = config.get<string>('LIVEKIT_PUBLIC_URL') ?? url;
     this.apiKey = config.getOrThrow<string>('LIVEKIT_API_KEY');
     this.apiSecret = config.getOrThrow<string>('LIVEKIT_API_SECRET');
-    this.urlCliente = this.normalizarUrlCliente(url);
+    this.urlCliente = this.normalizarUrlCliente(urlPublica);
     this.salas = new RoomServiceClient(
       this.normalizarUrlHttp(url),
       this.apiKey,

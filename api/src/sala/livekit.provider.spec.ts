@@ -7,6 +7,12 @@ const SEGREDO = 'segredo-livekit-com-tamanho-suficiente';
 
 describe('LiveKitProvider', () => {
   const config = {
+    get: jest.fn((chave: string) => {
+      if (chave === 'LIVEKIT_PUBLIC_URL') {
+        return 'https://video.pad.example';
+      }
+      return undefined;
+    }),
     getOrThrow: jest.fn((chave: string) => {
       const valores: Record<string, string> = {
         LIVEKIT_URL: 'https://pad.livekit.example',
@@ -38,7 +44,7 @@ describe('LiveKitProvider', () => {
       canUpdateOwnMetadata: false,
     });
     expect((claims.exp ?? 0) - (claims.nbf ?? 0)).toBeLessThanOrEqual(300);
-    expect(provider.url).toBe('wss://pad.livekit.example');
+    expect(provider.url).toBe('wss://video.pad.example');
   });
 
   it('gera credenciais diferentes mesmo para a mesma pessoa e segundo', async () => {
