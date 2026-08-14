@@ -1,169 +1,50 @@
 import {
   ArrowLeftIcon,
-  LockKeyIcon,
+  MicrophoneIcon,
   ShieldCheckIcon,
-  SignOutIcon,
   VideoCameraIcon,
-  WarningCircleIcon,
 } from '@phosphor-icons/react'
-import {
-  LiveKitRoom,
-  RoomAudioRenderer,
-  VideoConference,
-} from '@livekit/components-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
 import { ErrorState, TableSkeleton } from '../../../components/ui/DataState'
 import { RiskBadge } from '../../../components/ui/StatusBadge'
 import { getApiErrorMessage } from '../../../lib/api'
 import { formatCpf } from '../../../lib/format'
 import { getAttendance } from '../../atendimentos/atendimentos.api'
-import type { AttendanceDetail } from '../../atendimentos/atendimentos.types'
 import { useAuth } from '../../auth/auth-context'
-import { MedicalActions } from '../components/MedicalActions'
-import { NursingActions } from '../components/NursingActions'
 import { PatientInviteCard } from '../components/PatientInviteCard'
 import { PostMeetingActions } from '../components/PostMeetingActions'
+import { ProfessionalWorkspace } from '../components/ProfessionalWorkspace'
 import { createProfessionalRoomAccess } from '../sala.api'
-import type { RoomAccess } from '../sala.types'
-
-type ProfessionalWorkspaceProps = {
-  access: RoomAccess
-  attendance: AttendanceDetail
-  role: 'ENFERMEIRO' | 'MEDICO'
-  onComplete: () => void
-  onReview: () => void
-  onReconnect: () => void
-  reconnecting: boolean
-  reconnectError: unknown
-}
-
-function ProfessionalWorkspace({
-  access,
-  attendance,
-  role,
-  onComplete,
-  onReview,
-  onReconnect,
-  reconnecting,
-  reconnectError,
-}: ProfessionalWorkspaceProps) {
-  const [disconnected, setDisconnected] = useState(false)
-
-  return (
-    <div className="conference-screen professional-conference-screen">
-      <div className="professional-room-workspace">
-        <section className="conference-stage" aria-label="Videoconsulta">
-          <LiveKitRoom
-            key={access.token}
-            token={access.token}
-            serverUrl={access.url}
-            connect
-            audio
-            video
-            data-lk-theme="default"
-            className="conference-room"
-            onConnected={() => setDisconnected(false)}
-            onDisconnected={() => setDisconnected(true)}
-          >
-            <VideoConference />
-            <RoomAudioRenderer />
-          </LiveKitRoom>
-
-          {disconnected ? (
-            <div className="conference-disconnected" role="alert">
-              <WarningCircleIcon size={23} weight="duotone" />
-              <div>
-                <strong>A videochamada foi encerrada</strong>
-                <p>
-                  O atendimento continua aberto. Revise as ações ou conecte-se
-                  novamente.
-                </p>
-                {reconnectError ? (
-                  <small>{getApiErrorMessage(reconnectError)}</small>
-                ) : null}
-              </div>
-              <div className="conference-disconnected__actions">
-                <Button type="button" size="sm" onClick={onReview}>
-                  Revisar atendimento
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  loading={reconnecting}
-                  onClick={onReconnect}
-                >
-                  Reconectar
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </section>
-
-        <aside className="care-workspace" aria-label="Área assistencial">
-          <header className="care-workspace__patient">
-            <div>
-              <p>Atendimento em andamento</p>
-              <h1>{attendance.paciente.nome}</h1>
-              <span>{formatCpf(attendance.paciente.cpf)}</span>
-            </div>
-            <RiskBadge risk={attendance.risco} />
-          </header>
-
-          <PatientInviteCard attendanceId={attendance.id} />
-
-          {role === 'ENFERMEIRO' ? (
-            <NursingActions
-              attendance={attendance}
-              onComplete={onComplete}
-            />
-          ) : (
-            <MedicalActions attendance={attendance} onComplete={onComplete} />
-          )}
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            icon={<SignOutIcon size={17} />}
-            onClick={onReview}
-          >
-            Encerrar videochamada e revisar atendimento
-          </Button>
-        </aside>
-      </div>
-    </div>
-  )
-}
 
 export function ProfessionalRoomPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [meetingEnded, setMeetingEnded] = useState(false)
+
   const attendance = useQuery({
     queryKey: ['attendance', id],
     queryFn: () => getAttendance(id),
     enabled: Boolean(id),
   })
+
   const access = useMutation({
     mutationFn: () => createProfessionalRoomAccess(id),
   })
 
-  if (
-    access.data &&
-    attendance.data &&
-    (user?.papel === 'ENFERMEIRO' || user?.papel === 'MEDICO')
-  ) {
+  const isClinical = user?.papel === 'ENFERMEIRO' || user?.papel === 'MEDICO'
+
+  if (access.data && attendance.data && isClinical) {
     return (
       <ProfessionalWorkspace
         key={access.data.token}
         access={access.data}
         attendance={attendance.data}
-        role={user.papel}
+        role={user.papel as 'ENFERMEIRO' | 'MEDICO'}
         onComplete={() => navigate('/fila')}
         onReview={() => {
           setMeetingEnded(true)
@@ -178,16 +59,17 @@ export function ProfessionalRoomPage() {
 
   return (
     <div className="room-lobby">
-      <Button
-        className="back-button"
-        type="button"
-        variant="ghost"
-        size="sm"
-        icon={<ArrowLeftIcon size={17} />}
-        onClick={() => navigate('/fila')}
-      >
-        Voltar para a fila
-      </Button>
+      <div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          icon={<ArrowLeftIcon size={16} />}
+          onClick={() => navigate('/fila')}
+        >
+          Voltar para a fila
+        </Button>
+      </div>
 
       {attendance.isLoading ? <TableSkeleton rows={4} /> : null}
       {attendance.isError ? (
@@ -202,34 +84,52 @@ export function ProfessionalRoomPage() {
           <div className="room-lobby__visual" aria-hidden="true">
             <div className="brand-rings" />
             <span>
-              <VideoCameraIcon size={31} weight="duotone" />
+              <VideoCameraIcon size={30} weight="duotone" />
             </span>
           </div>
+
           <div className="room-lobby__content">
             <p>Sala de teleatendimento</p>
             <h1>{attendance.data.paciente.nome}</h1>
+
             <div className="room-patient-meta">
               <span>{formatCpf(attendance.data.paciente.cpf)}</span>
               <RiskBadge risk={attendance.data.risco} />
             </div>
+
             <div className="room-safety-note">
-              <ShieldCheckIcon size={20} weight="duotone" />
+              <ShieldCheckIcon size={19} weight="duotone" aria-hidden="true" />
               <p>
                 O acesso é individual, temporário e vinculado a este
                 atendimento.
               </p>
             </div>
+
+            {/* Lembrete de dispositivos antes de entrar: o "não te ouço" dos
+                primeiros trinta segundos custa mais tempo de consulta do que
+                qualquer outra falha da sala. */}
+            <div className="device-check">
+              <span className="device-check__item">
+                <VideoCameraIcon size={14} aria-hidden="true" />
+                Câmera será solicitada
+              </span>
+              <span className="device-check__item">
+                <MicrophoneIcon size={14} aria-hidden="true" />
+                Microfone será solicitado
+              </span>
+            </div>
+
             <PatientInviteCard attendanceId={attendance.data.id} />
+
             {access.isError ? (
-              <div className="inline-alert" role="alert">
-                <LockKeyIcon size={19} />
-                {getApiErrorMessage(access.error)}
-              </div>
+              <Alert tone="error">{getApiErrorMessage(access.error)}</Alert>
             ) : null}
+
             <Button
               type="button"
+              size="lg"
               loading={access.isPending}
-              icon={<VideoCameraIcon size={19} weight="fill" />}
+              icon={<VideoCameraIcon size={18} weight="fill" />}
               onClick={() => access.mutate()}
             >
               Entrar na sala segura
@@ -241,11 +141,10 @@ export function ProfessionalRoomPage() {
         </section>
       ) : null}
 
-      {attendance.data &&
-      (user?.papel === 'ENFERMEIRO' || user?.papel === 'MEDICO') ? (
+      {attendance.data && isClinical ? (
         <PostMeetingActions
           attendance={attendance.data}
-          role={user.papel}
+          role={user.papel as 'ENFERMEIRO' | 'MEDICO'}
           meetingEnded={meetingEnded}
           onComplete={() => navigate('/fila')}
         />

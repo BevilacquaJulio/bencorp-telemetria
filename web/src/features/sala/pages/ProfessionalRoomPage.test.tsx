@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PropsWithChildren } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -21,6 +21,7 @@ import {
   createPatientInvite,
   createProfessionalRoomAccess,
 } from '../sala.api'
+import { ToastProvider } from '../../../components/ui/ToastProvider'
 import { ProfessionalRoomPage } from './ProfessionalRoomPage'
 
 vi.mock('@livekit/components-react', () => ({
@@ -106,17 +107,19 @@ function renderRoom(authValue = auth) {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={authValue}>
-        <MemoryRouter initialEntries={['/atendimentos/atendimento-1/sala']}>
-          <Routes>
-            <Route
-              path="/atendimentos/:id/sala"
-              element={<ProfessionalRoomPage />}
-            />
-            <Route path="/fila" element={<p>Fila profissional</p>} />
-          </Routes>
-        </MemoryRouter>
-      </AuthContext.Provider>
+      <ToastProvider>
+        <AuthContext.Provider value={authValue}>
+          <MemoryRouter initialEntries={['/atendimentos/atendimento-1/sala']}>
+            <Routes>
+              <Route
+                path="/atendimentos/:id/sala"
+                element={<ProfessionalRoomPage />}
+              />
+              <Route path="/fila" element={<p>Fila profissional</p>} />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </ToastProvider>
     </QueryClientProvider>,
   )
 }
@@ -247,7 +250,9 @@ describe('ProfessionalRoomPage', () => {
     await user.click(
       screen.getByRole('button', { name: 'Encaminhar para médico' }),
     )
-    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
+    await user.click(
+      await screen.findByRole('button', { name: 'Encaminhar paciente' }),
+    )
 
     expect(mockedForwardAttendance).toHaveBeenCalledWith(attendance.id)
     expect(await screen.findByText('Fila profissional')).toBeInTheDocument()
@@ -288,7 +293,9 @@ describe('ProfessionalRoomPage', () => {
     await user.click(
       screen.getByRole('button', { name: 'Encaminhar para médico' }),
     )
-    await user.click(screen.getByRole('button', { name: 'Confirmar' }))
+    await user.click(
+      await screen.findByRole('button', { name: 'Encaminhar paciente' }),
+    )
 
     expect(mockedForwardAttendance).toHaveBeenCalledWith(attendance.id)
     expect(await screen.findByText('Fila profissional')).toBeInTheDocument()
@@ -354,6 +361,13 @@ describe('ProfessionalRoomPage', () => {
       'Orientada hidratação e acompanhamento.',
     )
     await user.click(screen.getByRole('button', { name: 'Salvar e finalizar' }))
+    // Finalizar encerra a sala e revoga o convite: passa por confirmação.
+    const finishDialog = await screen.findByRole('dialog', {
+      name: 'Finalizar o atendimento?',
+    })
+    await user.click(
+      within(finishDialog).getByRole('button', { name: 'Salvar e finalizar' }),
+    )
 
     expect(mockedCreateMedicalRecord).toHaveBeenCalledWith({
       attendanceId: attendance.id,

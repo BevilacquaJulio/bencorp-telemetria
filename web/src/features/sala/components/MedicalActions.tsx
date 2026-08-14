@@ -3,14 +3,17 @@ import {
   CheckCircleIcon,
   FloppyDiskIcon,
   NotePencilIcon,
-  WarningCircleIcon,
 } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
+import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { ErrorState, TableSkeleton } from '../../../components/ui/DataState'
+import { TextAreaField } from '../../../components/ui/FormField'
+import { useToast } from '../../../components/ui/toast-context'
 import { getApiErrorMessage } from '../../../lib/api'
 import { finalizeAttendance } from '../../atendimentos/atendimentos.api'
 import type { AttendanceDetail } from '../../atendimentos/atendimentos.types'
@@ -24,6 +27,7 @@ import type {
   MedicalRecord,
   MedicalRecordInput,
 } from '../../prontuario/prontuario.types'
+import { TriageReference } from './TriageReference'
 
 type MedicalRecordForm = z.infer<typeof medicalRecordSchema>
 
@@ -42,15 +46,19 @@ function toInput(values: MedicalRecordForm): MedicalRecordInput {
 
 export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) {
   const queryClient = useQueryClient()
+  const { notify } = useToast()
+  const [confirmingFinish, setConfirmingFinish] = useState(false)
+
   const recordQuery = useQuery({
     queryKey: ['medical-record', attendance.id],
     queryFn: () => getMedicalRecord(attendance.id),
   })
+
   const {
     register,
     reset,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<MedicalRecordForm>({
     resolver: zodResolver(medicalRecordSchema),
     defaultValues: { anamnese: '', conduta: '', prescricao: '' },
@@ -66,6 +74,10 @@ export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) 
     }
   }, [recordQuery.data, reset])
 
+  function cacheRecord(record: MedicalRecord) {
+    queryClient.setQueryData(['medical-record', attendance.id], record)
+  }
+
   async function persistRecord(values: MedicalRecordForm) {
     const input = toInput(values)
     return recordQuery.data
@@ -73,14 +85,24 @@ export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) 
       : createMedicalRecord({ attendanceId: attendance.id, input })
   }
 
-  function cacheRecord(record: MedicalRecord) {
-    queryClient.setQueryData(['medical-record', attendance.id], record)
-  }
-
   const save = useMutation({
     mutationFn: persistRecord,
-    onSuccess: cacheRecord,
+    onSuccess: (record) => {
+      cacheRecord(record)
+      reset(
+        {
+          anamnese: record.anamnese,
+          conduta: record.conduta,
+          prescricao: record.prescricao ?? '',
+        },
+        // Reaproveita os valores salvos como novo baseline: sem isso o form
+        // continuaria "sujo" e o aviso de alterações não salvas mentiria.
+        { keepValues: true },
+      )
+      notify({ tone: 'success', title: 'Prontuário salvo' })
+    },
   })
+
   const finish = useMutation({
     mutationFn: async (values: MedicalRecordForm) => {
       const record = await persistRecord(values)
@@ -89,9 +111,16 @@ export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) 
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['queue'] })
+      setConfirmingFinish(false)
+      notify({
+        tone: 'success',
+        title: 'Atendimento finalizado',
+        description: `Prontuário de ${attendance.paciente.nome} registrado.`,
+      })
       onComplete()
     },
   })
+
   const triage = attendance.encaminhadoDe?.triagem ?? attendance.triagem
   const mutationError = save.error ?? finish.error
 
@@ -109,7 +138,7 @@ export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) 
     <section className="clinical-panel" aria-labelledby="medical-record-title">
       <header className="clinical-panel__heading">
         <span aria-hidden="true">
-          <NotePencilIcon size={21} weight="duotone" />
+          <NotePencilIcon size={20} weight="duotone" />
         </span>
         <div>
           <h2 id="medical-record-title">Prontuário médico</h2>
@@ -117,54 +146,55 @@ export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) 
         </div>
       </header>
 
-      {triage ? (
-        <div className="triage-reference">
-          <strong>Resumo da triagem</strong>
-          <p>{triage.queixa}</p>
-          <span>
-            PA {triage.pa ?? '—'} · FC {triage.fc ?? '—'} · SpO₂{' '}
-            {triage.satO2 ?? '—'}% · Temp. {triage.temperatura ?? '—'} °C
-          </span>
-        </div>
-      ) : null}
+      {triage ? <TriageReference triage={triage} /> : null}
 
-      <form className="clinical-form" onSubmit={handleSubmit((values) => save.mutate(values))}>
-        <label className="text-area-field">
-          <span>Anamnese</span>
-          <textarea rows={5} {...register('anamnese')} />
-          {errors.anamnese ? <small>{errors.anamnese.message}</small> : null}
-        </label>
-        <label className="text-area-field">
-          <span>Conduta</span>
-          <textarea rows={4} {...register('conduta')} />
-          {errors.conduta ? <small>{errors.conduta.message}</small> : null}
-        </label>
-        <label className="text-area-field">
-          <span>Prescrição</span>
-          <textarea rows={4} {...register('prescricao')} />
-          {errors.prescricao ? <small>{errors.prescricao.message}</small> : null}
-        </label>
+      <form
+        className="clinical-form"
+        onSubmit={handleSubmit((values) => save.mutate(values))}
+      >
+        <TextAreaField
+          label="Anamnese"
+          rows={5}
+          placeholder="História clínica, queixa e evolução relatadas na consulta."
+          error={errors.anamnese?.message}
+          {...register('anamnese')}
+        />
+        <TextAreaField
+          label="Conduta"
+          rows={4}
+          placeholder="Orientações, encaminhamentos e exames solicitados."
+          error={errors.conduta?.message}
+          {...register('conduta')}
+        />
+        <TextAreaField
+          label="Prescrição"
+          rows={4}
+          placeholder="Medicamentos, posologia e duração. Deixe em branco se não houver."
+          hint="Campo opcional."
+          error={errors.prescricao?.message}
+          {...register('prescricao')}
+        />
 
         {mutationError ? (
-          <div className="compact-alert" role="alert">
-            <WarningCircleIcon size={18} />
+          <Alert tone="error" compact>
             {getApiErrorMessage(mutationError)}
-          </div>
+          </Alert>
         ) : null}
 
-        {save.isSuccess && !save.isPending ? (
-          <p className="clinical-save-success" role="status">
-            <CheckCircleIcon size={17} /> Prontuário salvo.
+        {save.isSuccess && !isDirty ? (
+          <p className="save-indicator" role="status">
+            <CheckCircleIcon size={15} weight="fill" aria-hidden="true" />
+            Prontuário salvo.
           </p>
         ) : null}
 
-        <div className="clinical-end-actions">
+        <div className="clinical-actions">
           <Button
             type="submit"
             variant="secondary"
             loading={save.isPending}
             disabled={finish.isPending}
-            icon={<FloppyDiskIcon size={18} />}
+            icon={<FloppyDiskIcon size={17} />}
           >
             Salvar prontuário
           </Button>
@@ -172,13 +202,38 @@ export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) 
             type="button"
             loading={finish.isPending}
             disabled={save.isPending}
-            icon={<CheckCircleIcon size={18} />}
-            onClick={() => void handleSubmit((values) => finish.mutate(values))()}
+            icon={<CheckCircleIcon size={17} />}
+            onClick={() => setConfirmingFinish(true)}
           >
             Salvar e finalizar
           </Button>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={confirmingFinish}
+        eyebrow="Encerramento"
+        title="Finalizar o atendimento?"
+        description="O prontuário é salvo e o atendimento é encerrado."
+        consequences={[
+          'A sala é encerrada e o convite do paciente deixa de funcionar.',
+          'O atendimento sai da fila e passa a constar como finalizado.',
+          'Correções posteriores só entram como adendo, preservando o registro original.',
+        ]}
+        confirmLabel="Salvar e finalizar"
+        cancelLabel="Continuar editando"
+        tone="warning"
+        loading={finish.isPending}
+        error={
+          finish.isError ? (
+            <Alert tone="error" compact>
+              {getApiErrorMessage(finish.error)}
+            </Alert>
+          ) : null
+        }
+        onConfirm={() => void handleSubmit((values) => finish.mutate(values))()}
+        onCancel={() => setConfirmingFinish(false)}
+      />
     </section>
   )
 }

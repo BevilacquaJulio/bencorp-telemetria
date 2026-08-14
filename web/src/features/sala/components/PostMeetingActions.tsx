@@ -10,6 +10,13 @@ type PostMeetingActionsProps = {
   onComplete: () => void
 }
 
+/**
+ * Ações que sobrevivem ao fim da videochamada.
+ *
+ * A chamada cair não pode significar perder o atendimento: a triagem já
+ * registrada e o vínculo com o paciente continuam, e a decisão assistencial
+ * segue disponível até o encaminhamento ou a finalização.
+ */
 export function PostMeetingActions({
   attendance,
   role,
@@ -18,15 +25,15 @@ export function PostMeetingActions({
 }: PostMeetingActionsProps) {
   return (
     <section
-      className="post-meeting-workspace page-enter page-enter--2"
+      className="post-meeting page-enter page-enter--2"
       aria-labelledby="post-meeting-title"
     >
-      <header className="post-meeting-workspace__heading">
+      <header className="post-meeting__heading">
         <span aria-hidden="true">
           {meetingEnded ? (
-            <CheckCircleIcon size={25} weight="duotone" />
+            <CheckCircleIcon size={23} weight="duotone" />
           ) : (
-            <ClipboardTextIcon size={25} weight="duotone" />
+            <ClipboardTextIcon size={23} weight="duotone" />
           )}
         </span>
         <div>
@@ -48,13 +55,11 @@ export function PostMeetingActions({
         </div>
       </header>
 
-      <div className="post-meeting-workspace__actions">
-        {role === 'ENFERMEIRO' ? (
-          <NursingActions attendance={attendance} onComplete={onComplete} />
-        ) : (
-          <MedicalActions attendance={attendance} onComplete={onComplete} />
-        )}
-      </div>
+      {role === 'ENFERMEIRO' ? (
+        <NursingActions attendance={attendance} onComplete={onComplete} />
+      ) : (
+        <MedicalActions attendance={attendance} onComplete={onComplete} />
+      )}
     </section>
   )
 }
