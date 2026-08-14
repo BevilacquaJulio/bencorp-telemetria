@@ -76,6 +76,8 @@ describe('PatientDetailPage', () => {
     expect(screen.getByText('123.456.789-01')).toBeInTheDocument()
     expect(screen.getByText('(11) 99999-9999')).toBeInTheDocument()
     expect(screen.getByText('Cefaleia e mal-estar')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Paciente cadastrado' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Triagem de enfermagem' })).toBeInTheDocument()
     expect(screen.getByText('120/80')).toBeInTheDocument()
     expect(screen.getByText('37.2')).toBeInTheDocument()
     expect(
@@ -117,10 +119,10 @@ describe('PatientDetailPage', () => {
     ).toBeInTheDocument()
     expect(
       screen.getByText(
-        'Cadastro concluído. O paciente aguarda o início do atendimento para realizar a triagem.',
+        'Cadastro concluído e paciente incluído na fila de atendimento.',
       ),
     ).toBeInTheDocument()
-    expect(screen.getByText('Status atual')).toBeInTheDocument()
+    expect(screen.getByText('Cadastro')).toBeInTheDocument()
     expect(screen.queryByText('Sem triagem')).not.toBeInTheDocument()
     expect(screen.queryByText('Em atendimento')).not.toBeInTheDocument()
     expect(screen.queryByText('Triagem pendente')).not.toBeInTheDocument()
@@ -153,7 +155,10 @@ describe('PatientDetailPage', () => {
     renderPatientDetail()
 
     expect(
-      await screen.findByRole('heading', { name: 'Triagem pendente' }),
+      await screen.findByRole('heading', { name: 'Paciente cadastrado' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Triagem pendente' }),
     ).toBeInTheDocument()
     expect(screen.getAllByText('Triagem pendente')).toHaveLength(1)
     expect(screen.getByText('Ana Ferreira')).toBeInTheDocument()

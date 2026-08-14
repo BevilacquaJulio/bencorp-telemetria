@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAttendancePresentation } from '../attendance-status'
+import { buildCareEvents } from '../attendance-status'
 import type { PatientAttendance } from '../pacientes.types'
 
 const baseAttendance: PatientAttendance = {
@@ -14,32 +14,62 @@ const baseAttendance: PatientAttendance = {
   triagem: null,
 }
 
-describe('getAttendancePresentation', () => {
-  it.each([
-    ['AGUARDANDO', 'Paciente cadastrado'],
-    ['EM_ANDAMENTO', 'Triagem pendente'],
-    ['FINALIZADO', 'Atendimento finalizado'],
-    ['CANCELADO', 'Atendimento cancelado'],
-  ] as const)('explica o status %s', (status, expected) => {
-    expect(getAttendancePresentation({ ...baseAttendance, status }).title).toBe(
-      expected,
-    )
+describe('buildCareEvents', () => {
+  it('mostra só o cadastro enquanto o paciente aguarda na fila', () => {
+    const events = buildCareEvents(baseAttendance)
+    expect(events.map((event) => event.title)).toEqual(['Paciente cadastrado'])
   })
 
-  it('diferencia atendimento em andamento com triagem registrada', () => {
-    expect(
-      getAttendancePresentation({
-        ...baseAttendance,
-        status: 'EM_ANDAMENTO',
-        triagem: {
-          queixa: 'Dor de cabeça',
-          pa: null,
-          fc: null,
-          temperatura: null,
-          satO2: null,
-          criadoEm: '2026-08-14T12:10:00.000Z',
-        },
-      }).title,
-    ).toBe('Triagem registrada')
+  it('mantém o cadastro e acrescenta a triagem quando o atendimento começa', () => {
+    const events = buildCareEvents({
+      ...baseAttendance,
+      status: 'EM_ANDAMENTO',
+      iniciadoEm: '2026-08-14T12:05:00.000Z',
+      profissional: { id: 'enfermeiro-1', nome: 'Ana Ferreira' },
+    })
+    expect(events.map((event) => event.title)).toEqual([
+      'Paciente cadastrado',
+      'Triagem pendente',
+    ])
+  })
+
+  it('não apaga o cadastro depois que a triagem é registrada', () => {
+    const events = buildCareEvents({
+      ...baseAttendance,
+      status: 'EM_ANDAMENTO',
+      triagem: {
+        queixa: 'Dor de cabeça',
+        pa: null,
+        fc: null,
+        temperatura: null,
+        satO2: null,
+        criadoEm: '2026-08-14T12:10:00.000Z',
+      },
+    })
+    expect(events.map((event) => event.title)).toEqual([
+      'Paciente cadastrado',
+      'Triagem de enfermagem',
+    ])
+  })
+
+  it('encerra a linha com o desfecho depois do cadastro e da triagem', () => {
+    const events = buildCareEvents({
+      ...baseAttendance,
+      status: 'FINALIZADO',
+      finalizadoEm: '2026-08-14T12:30:00.000Z',
+      triagem: {
+        queixa: 'Dor de cabeça',
+        pa: null,
+        fc: null,
+        temperatura: null,
+        satO2: null,
+        criadoEm: '2026-08-14T12:10:00.000Z',
+      },
+    })
+    expect(events.map((event) => event.title)).toEqual([
+      'Paciente cadastrado',
+      'Triagem de enfermagem',
+      'Atendimento finalizado',
+    ])
   })
 })
