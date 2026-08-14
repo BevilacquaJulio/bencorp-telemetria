@@ -1,5 +1,6 @@
 import {
   MagnifyingGlassIcon,
+  PlusIcon,
   ProhibitIcon,
   ShieldCheckIcon,
   UserGearIcon,
@@ -14,8 +15,10 @@ import {
   TableSkeleton,
 } from '../../../components/ui/DataState'
 import { getApiErrorMessage } from '../../../lib/api'
-import { formatDate, formatRole, initials } from '../../../lib/format'
+import { formatDate, initials } from '../../../lib/format'
 import type { Papel } from '../../auth/auth.types'
+import { UserCreatePanel } from '../components/UserCreatePanel'
+import { UserRoleControl } from '../components/UserRoleControl'
 import { listUsers, setUserActive } from '../usuarios.api'
 
 export function UsersPage() {
@@ -24,6 +27,7 @@ export function UsersPage() {
   const deferredSearch = useDeferredValue(search)
   const [role, setRole] = useState<Papel | ''>('')
   const [page, setPage] = useState(1)
+  const [creatingUser, setCreatingUser] = useState(false)
   const users = useQuery({
     queryKey: ['users', deferredSearch, role, page],
     queryFn: () => listUsers(deferredSearch, role, page),
@@ -45,11 +49,25 @@ export function UsersPage() {
           <h1>Usuários e acessos</h1>
           <p>Gerencie perfis profissionais sem acessar informações clínicas.</p>
         </div>
-        <div className="page-heading__date">
-          <ShieldCheckIcon size={18} />
-          Gestão de acesso restrita
+        <div className="page-heading__actions">
+          <div className="page-heading__date">
+            <ShieldCheckIcon size={18} />
+            Gestão de acesso restrita
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            icon={<PlusIcon size={17} />}
+            onClick={() => setCreatingUser(true)}
+          >
+            Novo usuário
+          </Button>
         </div>
       </header>
+
+      {creatingUser ? (
+        <UserCreatePanel onClose={() => setCreatingUser(false)} />
+      ) : null}
 
       <section className="admin-summary page-enter page-enter--1">
         <div>
@@ -159,7 +177,9 @@ export function UsersPage() {
                           </div>
                         </div>
                       </td>
-                      <td>{formatRole(user.papel)}</td>
+                      <td>
+                        <UserRoleControl user={user} />
+                      </td>
                       <td>{formatDate(user.criadoEm)}</td>
                       <td>
                         <span
@@ -199,7 +219,7 @@ export function UsersPage() {
                     </div>
                   </div>
                   <div className="user-card__meta">
-                    <span>{formatRole(user.papel)}</span>
+                    <UserRoleControl user={user} />
                     <span
                       className={`access-state ${user.ativo ? 'is-active' : 'is-inactive'}`}
                     >

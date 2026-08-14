@@ -16,3 +16,10 @@ export type UsersResponse = {
   porPagina: number
   paginas: number
 }
+
+export type CreateUserInput = {
+  nome: string
+  email: string
+  senha: string
+  papel: Papel
+}

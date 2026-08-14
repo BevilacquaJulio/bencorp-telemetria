@@ -68,8 +68,9 @@ export function QueuePage() {
   })
 
   const items = queue.data?.itens ?? []
+  const activeAttendance = queue.data?.atendimentoAtivo ?? null
   const waiting = items.filter((item) => item.status === 'AGUARDANDO').length
-  const active = items.filter((item) => item.status === 'EM_ANDAMENTO').length
+  const active = activeAttendance ? 1 : 0
   const priority = items.filter(
     (item) => item.risco === 'VERMELHO' || item.risco === 'LARANJA',
   ).length
@@ -133,6 +134,32 @@ export function QueuePage() {
           <small>Vermelho ou laranja</small>
         </article>
       </section>
+
+      {activeAttendance ? (
+        <section className="active-attendance-banner page-enter" role="status">
+          <span aria-hidden="true">
+            <StethoscopeIcon size={24} weight="duotone" />
+          </span>
+          <div>
+            <p>Atendimento em andamento</p>
+            <strong>{activeAttendance.paciente.nome}</strong>
+            <small>
+              Esta ficha permanece disponível independentemente do período
+              selecionado.
+            </small>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            icon={<ArrowRightIcon size={17} />}
+            onClick={() =>
+              navigate(`/atendimentos/${activeAttendance.id}/sala`)
+            }
+          >
+            Continuar atendimento
+          </Button>
+        </section>
+      ) : null}
 
       <section className="panel queue-panel page-enter page-enter--2">
         <div className="filter-bar">

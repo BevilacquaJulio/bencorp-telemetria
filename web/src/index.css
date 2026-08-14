@@ -912,6 +912,12 @@ img {
   color: var(--brand-teal-700);
 }
 
+.page-heading__actions {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
 .metrics-grid {
   display: grid;
   grid-template-columns: minmax(250px, 1.8fr) repeat(3, minmax(150px, 1fr));
@@ -994,6 +1000,59 @@ img {
 
 .metric--attention > strong {
   color: var(--warning);
+}
+
+.active-attendance-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  padding: 1rem 1.15rem;
+  color: #eaffff;
+  border: 1px solid rgb(108 208 204 / 0.2);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(8 175 173 / 0.23), transparent 38%),
+    var(--brand-blue-900);
+  box-shadow: var(--shadow-sm);
+  align-items: center;
+}
+
+.active-attendance-banner > span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  color: #8de2df;
+  border: 1px solid rgb(141 226 223 / 0.2);
+  border-radius: 12px;
+  background: rgb(4 38 59 / 0.28);
+  place-items: center;
+}
+
+.active-attendance-banner p,
+.active-attendance-banner strong,
+.active-attendance-banner small {
+  display: block;
+  margin: 0;
+}
+
+.active-attendance-banner p {
+  margin-bottom: 0.2rem;
+  color: #75d8d5;
+  font-size: 0.63rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.active-attendance-banner strong {
+  color: #f5ffff;
+  font-size: 0.9rem;
+}
+
+.active-attendance-banner small {
+  margin-top: 0.2rem;
+  color: #b6d0d9;
+  font-size: 0.68rem;
 }
 
 .panel {
@@ -1958,6 +2017,145 @@ tbody tr:last-child td {
   font-size: 1.45rem;
 }
 
+.user-create-panel {
+  overflow: hidden;
+  border: 1px solid #cfe2e5;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.user-create-panel > header {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem 1.4rem;
+  border-bottom: 1px solid var(--border);
+  background:
+    linear-gradient(90deg, rgb(8 175 173 / 0.08), transparent 42%),
+    var(--surface-muted);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.user-create-panel header p,
+.user-create-panel header h2,
+.user-create-panel header span {
+  margin: 0;
+}
+
+.user-create-panel header p {
+  margin-bottom: 0.25rem;
+  color: var(--brand-teal-700);
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.user-create-panel header h2 {
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+
+.user-create-panel header span {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.user-create-panel > header > button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  color: var(--muted);
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+  place-items: center;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.user-create-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.4rem;
+}
+
+.user-create-form__actions,
+.user-create-form .form-alert {
+  grid-column: 1 / -1;
+}
+
+.user-create-form__actions {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+.select-field,
+.text-area-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.select-field > span,
+.text-area-field > span,
+.invite-link-field > span {
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.select-field select,
+.user-role-control select,
+.text-area-field textarea,
+.invite-link-field input {
+  width: 100%;
+  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--surface);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.select-field select,
+.user-role-control select {
+  min-height: 48px;
+  padding: 0 2.3rem 0 0.8rem;
+}
+
+.user-role-control select {
+  min-height: 36px;
+  padding-left: 0.65rem;
+  border-radius: 9px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.select-field select:focus,
+.user-role-control select:focus,
+.text-area-field textarea:focus,
+.invite-link-field input:focus {
+  border-color: var(--brand-teal-700);
+  box-shadow: 0 0 0 4px rgb(8 175 173 / 0.1);
+}
+
+.user-role-control {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 150px;
+}
+
+.user-role-control small,
+.text-area-field small {
+  color: var(--danger);
+  font-size: 0.68rem;
+}
+
 /* Video rooms */
 
 .room-lobby {
@@ -2080,14 +2278,286 @@ tbody tr:last-child td {
   background: #0b1f2b;
 }
 
-.conference-room {
+.professional-room-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+  width: 100%;
   height: 100dvh;
+}
+
+.conference-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.conference-room {
+  height: 100%;
   --lk-bg: #0b1f2b;
   --lk-bg2: #102b3a;
   --lk-bg3: #16394a;
   --lk-accent-bg: var(--brand-teal-700);
   --lk-accent-fg: #f5ffff;
   --lk-border-color: rgb(211 238 239 / 0.16);
+}
+
+.conference-disconnected {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  color: #d8f5f4;
+  border: 1px solid rgb(138 214 211 / 0.24);
+  border-radius: 13px;
+  background: rgb(7 42 59 / 0.94);
+  box-shadow: 0 15px 35px rgb(0 0 0 / 0.25);
+  backdrop-filter: blur(10px);
+  align-items: center;
+}
+
+.conference-disconnected > svg {
+  color: #76d6d3;
+}
+
+.conference-disconnected strong,
+.conference-disconnected p,
+.conference-disconnected small {
+  display: block;
+  margin: 0;
+}
+
+.conference-disconnected strong {
+  color: #f4ffff;
+  font-size: 0.8rem;
+}
+
+.conference-disconnected p,
+.conference-disconnected small {
+  margin-top: 0.2rem;
+  color: #aacbd3;
+  font-size: 0.68rem;
+}
+
+.conference-disconnected small {
+  color: #ffccd0;
+}
+
+.care-workspace {
+  display: flex;
+  min-height: 0;
+  padding: 1.1rem;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--canvas);
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.care-workspace__patient {
+  display: flex;
+  gap: 0.8rem;
+  padding: 1.05rem;
+  color: #f3ffff;
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(8 175 173 / 0.26), transparent 46%),
+    var(--brand-blue-900);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.care-workspace__patient p,
+.care-workspace__patient h1,
+.care-workspace__patient span {
+  margin: 0;
+}
+
+.care-workspace__patient p {
+  margin-bottom: 0.25rem;
+  color: #79d9d6;
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.care-workspace__patient h1 {
+  color: #f5ffff;
+  font-size: 1.12rem;
+  line-height: 1.2;
+}
+
+.care-workspace__patient div > span {
+  display: block;
+  margin-top: 0.3rem;
+  color: #b9d1da;
+  font-size: 0.68rem;
+}
+
+.patient-invite-card,
+.clinical-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.patient-invite-card > header,
+.clinical-panel__heading {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.patient-invite-card > header > span,
+.clinical-panel__heading > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  color: var(--brand-teal-700);
+  border-radius: 10px;
+  background: var(--brand-teal-soft);
+  place-items: center;
+}
+
+.patient-invite-card h2,
+.patient-invite-card p,
+.clinical-panel h2,
+.clinical-panel p {
+  margin: 0;
+}
+
+.patient-invite-card h2,
+.clinical-panel h2 {
+  color: var(--ink);
+  font-size: 0.83rem;
+}
+
+.patient-invite-card header p,
+.clinical-panel__heading p {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.invite-link-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.invite-link-field input {
+  height: 39px;
+  padding: 0 0.7rem;
+  color: var(--text);
+  font-size: 0.66rem;
+}
+
+.patient-invite-card .invite-expiration {
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.45;
+}
+
+.patient-invite-card__actions,
+.clinical-end-actions,
+.clinical-confirmation > div {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.clinical-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.text-area-field textarea {
+  min-height: 86px;
+  padding: 0.7rem;
+  resize: vertical;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.vital-signs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.vital-signs-grid .form-field__control {
+  min-height: 42px;
+}
+
+.vital-signs-grid .form-field input {
+  height: 40px;
+  padding-left: 0.7rem;
+  font-size: 0.76rem;
+}
+
+.triage-reference,
+.clinical-confirmation {
+  padding: 0.8rem;
+  border: 1px solid #d5e7e7;
+  border-radius: 11px;
+  background: var(--brand-teal-soft);
+}
+
+.triage-reference strong,
+.clinical-confirmation strong {
+  color: var(--ink);
+  font-size: 0.73rem;
+}
+
+.triage-reference p,
+.clinical-confirmation p {
+  margin-top: 0.3rem;
+  color: var(--text);
+  font-size: 0.69rem;
+  line-height: 1.5;
+}
+
+.triage-reference span {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.63rem;
+}
+
+.clinical-confirmation > div {
+  margin-top: 0.7rem;
+}
+
+.compact-alert,
+.clinical-save-success {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 9px;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  align-items: flex-start;
+}
+
+.compact-alert {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.clinical-save-success {
+  color: var(--success);
+  background: var(--success-soft);
+  align-items: center;
 }
 
 .patient-room-page {
@@ -2309,6 +2779,16 @@ tbody tr:last-child td {
     box-shadow: 0 13px 28px rgb(23 75 115 / 0.09);
     transform: translateY(-3px);
   }
+
+  .user-create-panel > header > button:hover {
+    color: var(--brand-blue);
+    background: var(--brand-teal-soft);
+  }
+
+  .patient-invite-card:hover,
+  .clinical-panel:hover {
+    border-color: #bfdadc;
+  }
 }
 
 /* Responsive */
@@ -2325,6 +2805,10 @@ tbody tr:last-child td {
 
   .patient-profile {
     grid-template-columns: 1fr;
+  }
+
+  .professional-room-workspace {
+    grid-template-columns: minmax(0, 1fr) 360px;
   }
 
   .patient-profile__facts {
@@ -2487,6 +2971,27 @@ tbody tr:last-child td {
   .room-lobby__visual {
     min-height: 220px;
   }
+
+  .professional-conference-screen {
+    overflow-y: auto;
+  }
+
+  .professional-room-workspace {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .conference-stage {
+    height: 62dvh;
+    min-height: 430px;
+  }
+
+  .care-workspace {
+    overflow: visible;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
 }
 
 @media (max-width: 720px) {
@@ -2526,6 +3031,25 @@ tbody tr:last-child td {
     margin-top: 0.8rem;
   }
 
+  .page-heading__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-heading__actions .page-heading__date {
+    margin-top: 0.8rem;
+  }
+
+  .user-create-form {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+
+  .user-create-form__actions,
+  .user-create-form .form-alert {
+    grid-column: auto;
+  }
+
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2540,6 +3064,15 @@ tbody tr:last-child td {
 
   .metric--attention {
     grid-column: 1 / -1;
+  }
+
+  .active-attendance-banner {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .active-attendance-banner .button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .desktop-table {
@@ -2694,6 +3227,15 @@ tbody tr:last-child td {
     width: 210px;
     margin-bottom: 2.2rem;
   }
+
+  .conference-disconnected {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .conference-disconnected .button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
 }
 
 @media (max-width: 440px) {
@@ -2726,6 +3268,28 @@ tbody tr:last-child td {
 
   .clinical-summary dl {
     grid-template-columns: 1fr;
+  }
+
+  .user-create-form__actions,
+  .clinical-end-actions,
+  .patient-invite-card__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .user-create-form__actions .button,
+  .clinical-end-actions .button,
+  .patient-invite-card__actions .button {
+    width: 100%;
+  }
+
+  .vital-signs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .conference-stage {
+    height: 56dvh;
+    min-height: 390px;
   }
 }
 

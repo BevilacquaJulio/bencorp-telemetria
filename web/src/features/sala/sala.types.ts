@@ -6,3 +6,10 @@ export type RoomAccess = {
   participante: 'PROFISSIONAL' | 'PACIENTE'
   expiraEm: string
 }
+
+export type PatientInvite = {
+  token: string
+  atendimentoId: string
+  expiraEm: string
+  link: string
+}

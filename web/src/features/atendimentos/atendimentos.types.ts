@@ -62,8 +62,18 @@ export type QueueFilters = {
 
 export type QueueResponse = {
   itens: AttendanceListItem[]
+  atendimentoAtivo: AttendanceListItem | null
   total: number
   pagina: number
   porPagina: number
   paginas: number
+}
+
+export type TriageInput = {
+  risco: Risco
+  queixa: string
+  pa?: string
+  fc?: number
+  temperatura?: number
+  satO2?: number
 }

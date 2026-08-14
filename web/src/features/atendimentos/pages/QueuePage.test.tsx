@@ -41,6 +41,7 @@ const waitingAttendance: AttendanceListItem = {
 function queueResponse(itens: AttendanceListItem[]): QueueResponse {
   return {
     itens,
+    atendimentoAtivo: null,
     total: itens.length,
     pagina: 1,
     porPagina: 10,
@@ -180,5 +181,29 @@ describe('QueuePage', () => {
     await user.click(attendButtons[0])
 
     expect(await screen.findByText('Sala profissional carregada')).toBeInTheDocument()
+  })
+
+  it('destaca o atendimento ativo mesmo fora do período da fila', async () => {
+    const user = userEvent.setup()
+    const activeAttendance: AttendanceListItem = {
+      ...waitingAttendance,
+      id: 'atendimento-antigo',
+      status: 'EM_ANDAMENTO',
+      entradaFila: '2026-08-12T12:00:00.000Z',
+      iniciadoEm: '2026-08-12T12:05:00.000Z',
+    }
+    mockedListQueue.mockResolvedValue({
+      ...queueResponse([]),
+      atendimentoAtivo: activeAttendance,
+    })
+    renderQueue()
+
+    expect(await screen.findByText('Atendimento em andamento')).toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: 'Continuar atendimento' }),
+    )
+
+    expect(await screen.findByText('Sala profissional carregada')).toBeInTheDocument()
+    expect(mockedStartAttendance).not.toHaveBeenCalled()
   })
 })
