@@ -60,27 +60,29 @@ export function PatientRoomPage() {
 
     return (
       <div className="conference-screen">
-        <LiveKitRoom
-          key={roomAccess.token}
-          token={roomAccess.token}
-          serverUrl={roomAccess.url}
-          connect
-          audio
-          video
-          data-lk-theme="default"
-          className="conference-room"
-          onConnected={() => {
-            renewal.reset()
-            setDisconnectedToken(null)
-          }}
-          onDisconnected={() => {
-            renewal.reset()
-            setDisconnectedToken(roomAccess.token)
-          }}
-        >
-          <VideoConference />
-          <RoomAudioRenderer />
-        </LiveKitRoom>
+        {!disconnected ? (
+          <LiveKitRoom
+            key={roomAccess.token}
+            token={roomAccess.token}
+            serverUrl={roomAccess.url}
+            connect
+            audio
+            video
+            data-lk-theme="default"
+            className="conference-room"
+            onConnected={() => {
+              renewal.reset()
+              setDisconnectedToken(null)
+            }}
+            onDisconnected={() => {
+              renewal.reset()
+              setDisconnectedToken(roomAccess.token)
+            }}
+          >
+            <VideoConference />
+            <RoomAudioRenderer />
+          </LiveKitRoom>
+        ) : null}
 
         {disconnected ? (
           <div
