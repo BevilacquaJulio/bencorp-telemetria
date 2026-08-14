@@ -14,6 +14,7 @@ import { FormField, TextAreaField } from '../../../components/ui/FormField'
 import { Select } from '../../../components/ui/Select'
 import { useToast } from '../../../components/ui/toast-context'
 import { getApiErrorMessage } from '../../../lib/api'
+import { useAuth } from '../../auth/auth-context'
 import {
   createTriage,
   finalizeAttendance,
@@ -64,6 +65,7 @@ const endActionCopy: Record<
 
 export function NursingActions({ attendance, onComplete }: NursingActionsProps) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const { notify } = useToast()
   const [confirming, setConfirming] = useState<EndAction | null>(null)
 
@@ -91,7 +93,10 @@ export function NursingActions({ attendance, onComplete }: NursingActionsProps) 
         input: toTriageInput(values),
       }),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['attendance', attendance.id], updated)
+      queryClient.setQueryData(
+        ['attendance', user?.id, attendance.id],
+        updated,
+      )
       void queryClient.invalidateQueries({ queryKey: ['queue'] })
       notify({ tone: 'success', title: 'Triagem registrada' })
     },

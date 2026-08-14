@@ -27,9 +27,9 @@ export function ProfessionalRoomPage() {
   const [meetingEnded, setMeetingEnded] = useState(false)
 
   const attendance = useQuery({
-    queryKey: ['attendance', id],
+    queryKey: ['attendance', user?.id, id],
     queryFn: () => getAttendance(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(user?.id),
   })
 
   const access = useMutation({

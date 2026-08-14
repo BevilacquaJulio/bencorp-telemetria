@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AuthContext, type AuthContextValue } from '../../auth/auth-context'
 import { getPatient } from '../pacientes.api'
 import { PatientDetailPage } from './PatientDetailPage'
 
@@ -11,6 +12,18 @@ vi.mock('../pacientes.api', () => ({
 
 const mockedGetPatient = vi.mocked(getPatient)
 
+const auth: AuthContextValue = {
+  user: {
+    id: 'medico-1',
+    nome: 'Carla Nogueira',
+    email: 'carla.nogueira@pad.local',
+    papel: 'MEDICO',
+  },
+  token: 'token-teste',
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+}
+
 function renderPatientDetail() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -18,11 +31,13 @@ function renderPatientDetail() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/pacientes/paciente-1']}>
-        <Routes>
-          <Route path="/pacientes/:id" element={<PatientDetailPage />} />
-        </Routes>
-      </MemoryRouter>
+      <AuthContext.Provider value={auth}>
+        <MemoryRouter initialEntries={['/pacientes/paciente-1']}>
+          <Routes>
+            <Route path="/pacientes/:id" element={<PatientDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>
     </QueryClientProvider>,
   )
 }

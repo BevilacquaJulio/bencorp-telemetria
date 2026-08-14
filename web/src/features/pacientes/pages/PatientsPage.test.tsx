@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AuthContext, type AuthContextValue } from '../../auth/auth-context'
 import { listPatients } from '../pacientes.api'
 import { PatientsPage } from './PatientsPage'
 
@@ -12,6 +13,18 @@ vi.mock('../pacientes.api', () => ({
 
 const mockedListPatients = vi.mocked(listPatients)
 
+const auth: AuthContextValue = {
+  user: {
+    id: 'enfermeiro-1',
+    nome: 'Ana Ferreira',
+    email: 'ana.ferreira@pad.local',
+    papel: 'ENFERMEIRO',
+  },
+  token: 'token-teste',
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+}
+
 function renderPatients() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -19,15 +32,17 @@ function renderPatients() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/pacientes']}>
-        <Routes>
-          <Route path="/pacientes" element={<PatientsPage />} />
-          <Route
-            path="/pacientes/:id"
-            element={<p>Detalhes carregados</p>}
-          />
-        </Routes>
-      </MemoryRouter>
+      <AuthContext.Provider value={auth}>
+        <MemoryRouter initialEntries={['/pacientes']}>
+          <Routes>
+            <Route path="/pacientes" element={<PatientsPage />} />
+            <Route
+              path="/pacientes/:id"
+              element={<p>Detalhes carregados</p>}
+            />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>
     </QueryClientProvider>,
   )
 }

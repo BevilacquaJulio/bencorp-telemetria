@@ -14,17 +14,19 @@ import {
 } from '../../../components/ui/DataState'
 import { getApiErrorMessage } from '../../../lib/api'
 import { formatCpf, formatDate, initials } from '../../../lib/format'
+import { useAuth } from '../../auth/auth-context'
 import { CareTimelineEntry } from '../components/CareTimelineEntry'
 import { getPatient } from '../pacientes.api'
 
 export function PatientDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const patient = useQuery({
-    queryKey: ['patient', id],
+    queryKey: ['patient', user?.id, id],
     queryFn: () => getPatient(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(user?.id),
   })
 
   if (patient.isLoading) return <TableSkeleton rows={7} />
