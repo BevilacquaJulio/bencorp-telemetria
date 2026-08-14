@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { Button } from '../../../components/ui/Button'
 import { getApiErrorMessage } from '../../../lib/api'
 import { formatDateTime } from '../../../lib/format'
+import { buildPublicAppUrl } from '../../../lib/public-url'
 import { createPatientInvite } from '../sala.api'
 import type { PatientInvite } from '../sala.types'
 
@@ -28,7 +29,7 @@ export function PatientInviteCard({ attendanceId }: { attendanceId: string }) {
     },
   })
   const publicLink = currentInvite
-    ? new URL(currentInvite.link, window.location.origin).toString()
+    ? buildPublicAppUrl(currentInvite.link)
     : null
 
   async function copyLink() {

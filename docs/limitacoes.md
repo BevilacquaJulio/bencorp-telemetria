@@ -22,13 +22,19 @@ cache genérico.
 ## 2. LiveKit local não representa produção
 
 O Compose executa uma instância única em modo de desenvolvimento, exposta por
-HTTP/WebSocket local e sem TLS ou TURN configurado para redes corporativas.
+HTTP/WebSocket local e sem TLS ou TURN configurado para redes corporativas. O
+endereço ICE é fixado em `127.0.0.1` para impedir que o LiveKit anuncie o IP
+inacessível da bridge do Docker e tornar determinístico o teste com duas sessões
+no mesmo computador.
 
 **Abordagem adotada:** oferecer vídeo e chat reproduzíveis sem conta externa,
 separando a URL interna usada pela API da URL pública usada pelo navegador.
 
-**Para produção:** usar LiveKit Cloud ou uma implantação com `wss://`, domínio,
-certificado confiável, TURN/TLS, firewall e monitoramento de conectividade.
+**Para produção ou outro dispositivo:** configurar `APP_PUBLIC_URL`,
+`LIVEKIT_PUBLIC_URL` e `LIVEKIT_NODE_IP` com endereços alcançáveis, além de usar
+`https://`/`wss://`, certificado confiável, TURN/TLS, firewall e monitoramento
+de conectividade. Nenhuma configuração somente de Compose consegue descobrir
+ou provisionar domínio, certificado, NAT e regras da rede de destino.
 
 ## 3. Revogação antecipada no LiveKit self-hosted
 

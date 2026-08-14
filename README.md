@@ -90,6 +90,11 @@ Os valores do exemplo funcionam apenas para demonstração local. Troque
 `JWT_SECRET`, `POSTGRES_PASSWORD` e `LIVEKIT_API_SECRET` em qualquer ambiente
 compartilhado.
 
+Por padrão, `LIVEKIT_NODE_IP=127.0.0.1` faz o LiveKit anunciar ao WebRTC um
+endereço alcançável por duas sessões no mesmo computador. Isso evita que o
+servidor divulgue o IP privado da bridge do Docker, que causaria a falha
+`could not establish pc connection` mesmo com o WebSocket conectado.
+
 ### 2. Valide e suba os serviços
 
 ```powershell
@@ -113,6 +118,28 @@ O Compose executa automaticamente, nesta ordem:
 | Saúde da API | <http://localhost:3000/saude> |
 | Swagger | <http://localhost:3000/docs> |
 | LiveKit WebSocket | `ws://localhost:7880` |
+
+### Teste da chamada em dois contextos
+
+Para o teste local recomendado, abra o profissional em uma janela normal e o
+convite do paciente em uma janela anônima do mesmo computador. Os valores padrão
+da `.env.example` já atendem esse cenário.
+
+Para outro computador ou celular, não use `localhost`. O endereço do frontend,
+do LiveKit e o candidato ICE precisam ser alcançáveis pelo segundo dispositivo.
+Além disso, câmera e microfone fora de `localhost` exigem um contexto HTTPS
+confiável no navegador. Configure, em um ambiente com domínio e TLS:
+
+```env
+APP_PUBLIC_URL=https://pad.seudominio.com.br
+LIVEKIT_PUBLIC_URL=wss://livekit.seudominio.com.br
+LIVEKIT_NODE_IP=203.0.113.10
+```
+
+O servidor deve permitir `7881/TCP` e `7882/UDP` e encaminhá-los para o host do
+LiveKit. Redes que bloqueiam ambos os transportes exigem TURN/TLS. Um IP de LAN
+pode ser usado para diagnóstico de sinalização/ICE, mas HTTP em IP privado não
+é uma configuração adequada para câmera e microfone em outro dispositivo.
 
 Para acompanhar a inicialização:
 
@@ -257,8 +284,10 @@ assistenciais permanecem `NetworkOnly` e exigem conexão com o servidor.
 | `SALA_TOKEN_TTL_SEG` | Vida do token da sala; máximo de 900 segundos |
 | `LIVEKIT_URL` | URL interna usada pela API para administrar salas |
 | `LIVEKIT_PUBLIC_URL` | URL devolvida ao navegador para entrar na chamada |
+| `LIVEKIT_NODE_IP` | IP alcançável anunciado pelo LiveKit nos candidatos ICE |
 | `LIVEKIT_API_KEY` | Chave do servidor LiveKit |
 | `LIVEKIT_API_SECRET` | Segredo do servidor LiveKit |
+| `APP_PUBLIC_URL` | Origem HTTPS usada para gerar convites compartilháveis |
 | `CORS_ORIGIN` | Origem permitida quando a API é acessada diretamente |
 
 O contrato completo está em [.env.example](./.env.example) e

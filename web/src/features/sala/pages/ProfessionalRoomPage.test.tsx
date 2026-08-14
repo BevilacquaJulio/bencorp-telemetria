@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { PropsWithChildren } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createTriage,
   finalizeAttendance,
@@ -122,6 +122,10 @@ function renderRoom(authValue = auth) {
 }
 
 describe('ProfessionalRoomPage', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   beforeEach(() => {
     mockedGetAttendance.mockReset().mockResolvedValue(attendance)
     mockedCreateTriage.mockReset()
@@ -160,6 +164,28 @@ describe('ProfessionalRoomPage', () => {
     expect(mockedCreateInvite).toHaveBeenCalledWith(attendance.id)
     expect(screen.getByLabelText('Link do paciente')).toHaveValue(
       `http://localhost:3000/sala/${attendance.id}?token=convite-opaco`,
+    )
+  })
+
+  it('usa a origem pública configurada no convite compartilhável', async () => {
+    const user = userEvent.setup()
+    vi.stubEnv('VITE_PUBLIC_APP_URL', 'https://pad.bencorp.example')
+    mockedCreateInvite.mockResolvedValue({
+      token: 'convite-opaco',
+      atendimentoId: attendance.id,
+      expiraEm: '2026-08-14T13:00:00.000Z',
+      link: `/sala/${attendance.id}?token=convite-opaco`,
+    })
+    renderRoom()
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Gerar convite do paciente',
+      }),
+    )
+
+    expect(screen.getByLabelText('Link do paciente')).toHaveValue(
+      `https://pad.bencorp.example/sala/${attendance.id}?token=convite-opaco`,
     )
   })
 

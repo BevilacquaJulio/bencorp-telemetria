@@ -31,7 +31,14 @@ services:
     image: livekit/livekit-server:v1.13.1
     container_name: pad-livekit
     restart: unless-stopped
-    command: ["--dev", "--bind", "0.0.0.0"]
+    command:
+      - "--dev"
+      - "--bind"
+      - "0.0.0.0"
+      # Impede o LiveKit de anunciar o IP privado da bridge do Docker
+      # (por exemplo, 172.21.0.3), que o navegador não consegue alcançar.
+      - "--node-ip"
+      - "${LIVEKIT_NODE_IP:-127.0.0.1}"
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
     ports:
@@ -109,6 +116,7 @@ services:
       context: ./web
       args:
         VITE_API_URL: /api
+        VITE_PUBLIC_APP_URL: ${APP_PUBLIC_URL:-}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:80"
