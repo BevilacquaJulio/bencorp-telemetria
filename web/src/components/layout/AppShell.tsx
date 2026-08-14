@@ -1,177 +1,193 @@
 import {
   CaretDownIcon,
   ListIcon,
-  QueueIcon,
-  ShieldCheckIcon,
+  SidebarSimpleIcon,
   SignOutIcon,
-  UserGearIcon,
-  UsersThreeIcon,
+  UserCircleIcon,
   XIcon,
-  type Icon,
 } from '@phosphor-icons/react'
-import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
-import compactLogo from '../../assets/bencorp.png'
-import { formatRole, initials } from '../../lib/format'
+import { useEffect, useState } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../features/auth/auth-context'
+import { useDisclosure } from '../../hooks/useDisclosure'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { formatRole } from '../../lib/format'
+import { Avatar } from '../ui/Avatar'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
+import {
+  DropdownItem,
+  DropdownMenu,
+  DropdownSeparator,
+} from '../ui/DropdownMenu'
+import { Breadcrumb } from './Breadcrumb'
+import { crumbsForPath, greetingForHour } from './shell-helpers'
+import { navigationForRole } from './navigation'
+import { SidebarNav } from './SidebarNav'
 
-type NavigationItem = {
-  to: string
-  label: string
-  description: string
-  icon: Icon
-}
-
-const clinicalNavigation: NavigationItem[] = [
-  {
-    to: '/fila',
-    label: 'Fila de atendimentos',
-    description: 'Demanda assistencial',
-    icon: QueueIcon,
-  },
-  {
-    to: '/pacientes',
-    label: 'Pacientes',
-    description: 'Histórico autorizado',
-    icon: UsersThreeIcon,
-  },
-]
-
-const adminNavigation: NavigationItem[] = [
-  {
-    to: '/usuarios',
-    label: 'Usuários e acessos',
-    description: 'Perfis profissionais',
-    icon: UserGearIcon,
-  },
-]
+const COLLAPSE_KEY = 'pad:sidebar-collapsed'
 
 export function AppShell() {
   const { user, signOut } = useAuth()
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const navigation = user?.papel === 'ADMIN' ? adminNavigation : clinicalNavigation
+  const location = useLocation()
+  const isOnline = useOnlineStatus()
+  const drawer = useDisclosure()
+  const signOutConfirm = useDisclosure()
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(COLLAPSE_KEY) === 'true',
+  )
+
+  // Trocar de rota fecha o drawer. Sem isso, voltar pelo botão do navegador
+  // deixa o menu aberto sobre a página nova.
+  //
+  // A dependência é `drawer.close` (memorizado em useDisclosure), nunca o
+  // objeto `drawer`: ele é recriado a cada render, o efeito rodaria sempre e
+  // fecharia o menu no mesmo ciclo em que ele abriu — o drawer nunca abriria.
+  const closeDrawer = drawer.close
+  useEffect(() => {
+    closeDrawer()
+  }, [location.pathname, closeDrawer])
+
+  useEffect(() => {
+    localStorage.setItem(COLLAPSE_KEY, String(collapsed))
+  }, [collapsed])
 
   if (!user) return null
 
-  const sidebar = (
-    <>
-      <div className="sidebar__brand">
-        <img src={compactLogo} alt="BenCorp" />
-        <span>PAD</span>
-      </div>
-      <div className="sidebar__workspace">
-        <span>Ambiente profissional</span>
-        <strong>Pronto Atendimento Digital</strong>
-      </div>
-      <nav className="sidebar__nav" aria-label="Navegação principal">
-        <p>Menu</p>
-        {navigation.map(({ to, label, description, icon: NavigationIcon }) => (
-          <NavLink
-            className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'is-active' : ''}`
-            }
-            to={to}
-            key={to}
-            onClick={() => setMobileOpen(false)}
-          >
-            <span className="sidebar-link__icon" aria-hidden="true">
-              <NavigationIcon size={21} weight="duotone" />
-            </span>
-            <span>
-              <strong>{label}</strong>
-              <small>{description}</small>
-            </span>
-          </NavLink>
-        ))}
-      </nav>
-      <div className="sidebar__trust">
-        <ShieldCheckIcon size={20} weight="duotone" />
-        <div>
-          <strong>Ambiente protegido</strong>
-          <span>Ações e acessos auditados</span>
-        </div>
-      </div>
-    </>
-  )
+  const sections = navigationForRole(user.papel)
+  const crumbs = crumbsForPath(location.pathname, sections)
+  const firstName = user.nome.split(' ')[0]
 
   return (
-    <div className="app-layout">
-      <aside className="sidebar">{sidebar}</aside>
+    <div className={`app-layout ${collapsed ? 'is-collapsed' : ''}`}>
+      <a className="skip-link" href="#conteudo-principal">
+        Pular para o conteúdo
+      </a>
 
+      <aside className="sidebar">
+        <SidebarNav sections={sections} />
+        <button
+          type="button"
+          className="sidebar__collapse"
+          aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+          onClick={() => setCollapsed((current) => !current)}
+        >
+          <SidebarSimpleIcon size={16} aria-hidden="true" />
+          <span>Recolher menu</span>
+        </button>
+      </aside>
+
+      {/* ---- Drawer móvel ---- */}
       <div
-        className={`mobile-overlay ${mobileOpen ? 'is-open' : ''}`}
-        onClick={() => setMobileOpen(false)}
-        aria-hidden={!mobileOpen}
+        className={`mobile-overlay ${drawer.isOpen ? 'is-open' : ''}`}
+        onClick={drawer.close}
+        aria-hidden="true"
       />
       <aside
-        className={`mobile-drawer ${mobileOpen ? 'is-open' : ''}`}
-        aria-label="Menu móvel"
-        aria-hidden={!mobileOpen}
+        className={`mobile-drawer ${drawer.isOpen ? 'is-open' : ''}`}
+        aria-label="Menu de navegação"
+        // `inert` retira o drawer fechado da ordem de tabulação; sem isso o
+        // foco entra num painel invisível e o cursor "some" para o usuário.
+        inert={!drawer.isOpen}
       >
         <button
           type="button"
           className="mobile-drawer__close"
           aria-label="Fechar menu"
-          onClick={() => setMobileOpen(false)}
+          onClick={drawer.close}
         >
-          <XIcon size={21} />
+          <XIcon size={19} aria-hidden="true" />
         </button>
-        {sidebar}
+        <SidebarNav sections={sections} onNavigate={drawer.close} />
       </aside>
 
       <div className="app-main">
         <header className="topbar">
-          <div className="topbar__mobile-brand">
-            <button
-              type="button"
-              aria-label="Abrir menu"
-              onClick={() => setMobileOpen(true)}
-            >
-              <ListIcon size={23} />
-            </button>
-            <img src={compactLogo} alt="BenCorp" />
+          <button
+            type="button"
+            className="icon-button topbar__menu-button"
+            aria-label="Abrir menu"
+            aria-expanded={drawer.isOpen}
+            onClick={drawer.open}
+          >
+            <ListIcon size={21} aria-hidden="true" />
+          </button>
+
+          <div className="topbar__context">
+            <Breadcrumb items={crumbs} />
+            <p className="topbar__greeting">
+              {greetingForHour(new Date())}, {firstName}
+            </p>
           </div>
 
-          <div className="topbar__welcome">
-            <span>Olá, {user.nome.split(' ')[0]}</span>
-            <small>Seu ambiente de trabalho está pronto.</small>
-          </div>
-
-          <div className="profile-menu">
-            <button
-              type="button"
-              className="profile-trigger"
-              aria-expanded={profileOpen}
-              aria-haspopup="menu"
-              onClick={() => setProfileOpen((open) => !open)}
-            >
-              <span className="profile-avatar">{initials(user.nome)}</span>
-              <span className="profile-trigger__text">
-                <strong>{user.nome}</strong>
-                <small>{formatRole(user.papel)}</small>
+          <div className="topbar__actions">
+            {!isOnline ? (
+              <span className="connection-pill connection-pill--offline">
+                Sem conexão
               </span>
-              <CaretDownIcon size={15} aria-hidden="true" />
-            </button>
-            {profileOpen ? (
-              <div className="profile-popover" role="menu">
-                <div>
+            ) : null}
+
+            <DropdownMenu
+              triggerLabel={`Conta de ${user.nome}`}
+              wide
+              trigger={
+                <span className="profile-trigger">
+                  <Avatar name={user.nome} size="sm" />
+                  <span className="profile-trigger__text">
+                    <strong>{user.nome}</strong>
+                    <small>{formatRole(user.papel)}</small>
+                  </span>
+                  <CaretDownIcon size={13} aria-hidden="true" />
+                </span>
+              }
+            >
+              <div className="menu-identity">
+                <Avatar name={user.nome} />
+                <span className="menu-identity__text">
                   <strong>{user.nome}</strong>
                   <span>{user.email}</span>
-                </div>
-                <button type="button" role="menuitem" onClick={signOut}>
-                  <SignOutIcon size={18} />
-                  Encerrar sessão
-                </button>
+                </span>
               </div>
-            ) : null}
+              <DropdownSeparator />
+              <DropdownItem
+                icon={<UserCircleIcon size={17} weight="duotone" />}
+                description={formatRole(user.papel)}
+                onSelect={() => undefined}
+                disabled
+              >
+                Perfil de acesso
+              </DropdownItem>
+              <DropdownSeparator />
+              <DropdownItem
+                icon={<SignOutIcon size={17} />}
+                tone="danger"
+                onSelect={signOutConfirm.open}
+              >
+                Encerrar sessão
+              </DropdownItem>
+            </DropdownMenu>
           </div>
         </header>
 
-        <main className="app-content">
+        <main className="app-content" id="conteudo-principal">
           <Outlet />
         </main>
       </div>
+
+      <ConfirmDialog
+        open={signOutConfirm.isOpen}
+        eyebrow="Sessão"
+        title="Encerrar sessão?"
+        description="Você precisará entrar novamente com suas credenciais profissionais."
+        consequences={[
+          'Atendimentos em andamento continuam abertos e vinculados a você.',
+          'Convites de sala já gerados seguem válidos até expirarem.',
+        ]}
+        confirmLabel="Encerrar sessão"
+        cancelLabel="Continuar trabalhando"
+        tone="danger"
+        onConfirm={signOut}
+        onCancel={signOutConfirm.close}
+      />
     </div>
   )
 }

@@ -11,11 +11,12 @@ import {
   UsersThreeIcon,
 } from '@phosphor-icons/react'
 import { useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { useForm } from 'react-hook-form'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import type { z } from 'zod'
 import fullLogo from '../../../assets/bencorp-full.png'
+import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
 import { FormField } from '../../../components/ui/FormField'
 import { getApiErrorMessage } from '../../../lib/api'
@@ -48,6 +49,7 @@ export function LoginPage() {
   const { user, signIn } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+
   const {
     register,
     handleSubmit,
@@ -68,18 +70,23 @@ export function LoginPage() {
     },
   })
 
-  if (user) {
-    return <Navigate to={defaultRouteForRole(user.papel)} replace />
-  }
-
-  const onSubmit = handleSubmit((values) => mutation.mutate(values))
+  if (user) return <Navigate to={defaultRouteForRole(user.papel)} replace />
 
   return (
     <main className="login-page">
       <section className="login-story" aria-label="Sobre o PAD BenCorp">
-        <div className="brand-rings brand-rings--large" aria-hidden="true" />
+        <div className="login-story__glow" aria-hidden="true" />
         <div className="login-story__content">
-          <p className="login-story__eyebrow">Cuidado corporativo desde 2008</p>
+          {/*
+            Decorativa de propósito: a marca já é anunciada pelo logo do cartão
+            de acesso, que é o único visível no celular. Dois `alt` iguais na
+            mesma página fariam o leitor de tela repetir "BenCorp Benefícios e
+            Saúde Ocupacional" duas vezes seguidas.
+          */}
+          <img className="login-story__logo" src={fullLogo} alt="" />
+          <p className="login-story__eyebrow">
+            Cuidado corporativo desde 2008
+          </p>
           <h1>Decisões seguras em cada etapa do atendimento.</h1>
           <p className="login-story__lead">
             Uma experiência clara para conduzir o cuidado ocupacional do
@@ -87,14 +94,14 @@ export function LoginPage() {
           </p>
 
           <div className="trust-list">
-            {trustPoints.map(({ icon: Icon, title, text }, index) => (
+            {trustPoints.map(({ icon: TrustIcon, title, text }, index) => (
               <article
                 className="trust-item login-reveal"
-                style={{ '--reveal-index': index } as React.CSSProperties}
+                style={{ '--reveal-index': index } as CSSProperties}
                 key={title}
               >
                 <span className="trust-item__icon" aria-hidden="true">
-                  <Icon size={22} weight="duotone" />
+                  <TrustIcon size={21} weight="duotone" />
                 </span>
                 <div>
                   <h2>{title}</h2>
@@ -119,13 +126,17 @@ export function LoginPage() {
             <span>Entre com suas credenciais profissionais.</span>
           </div>
 
-          <form className="login-form" onSubmit={onSubmit} noValidate>
+          <form
+            className="login-form"
+            onSubmit={handleSubmit((values) => mutation.mutate(values))}
+            noValidate
+          >
             <FormField
               label="E-mail profissional"
               type="email"
               autoComplete="email"
               placeholder="nome@empresa.com.br"
-              icon={<EnvelopeSimpleIcon size={19} />}
+              icon={<EnvelopeSimpleIcon size={18} />}
               error={errors.email?.message}
               {...register('email')}
             />
@@ -134,7 +145,7 @@ export function LoginPage() {
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               placeholder="Digite sua senha"
-              icon={<LockKeyIcon size={19} />}
+              icon={<LockKeyIcon size={18} />}
               action={
                 <button
                   className="password-toggle"
@@ -143,9 +154,9 @@ export function LoginPage() {
                   onClick={() => setShowPassword((visible) => !visible)}
                 >
                   {showPassword ? (
-                    <EyeSlashIcon size={19} />
+                    <EyeSlashIcon size={18} />
                   ) : (
-                    <EyeIcon size={19} />
+                    <EyeIcon size={18} />
                   )}
                 </button>
               }
@@ -154,31 +165,29 @@ export function LoginPage() {
             />
 
             {mutation.isError ? (
-              <div className="form-alert" role="alert">
-                <span aria-hidden="true">
-                  <ShieldCheckIcon size={18} />
-                </span>
-                {getApiErrorMessage(mutation.error)}
-              </div>
+              <Alert tone="error">{getApiErrorMessage(mutation.error)}</Alert>
             ) : null}
 
             <Button
               type="submit"
-              className="login-submit"
+              size="lg"
+              block
               loading={mutation.isPending}
-              icon={<ArrowRightIcon size={19} />}
+              trailingIcon={<ArrowRightIcon size={18} weight="bold" />}
             >
               Acessar plataforma
             </Button>
           </form>
 
+          {/* Só no bundle de desenvolvimento: `import.meta.env.DEV` é avaliado
+              em build e o bloco desaparece do artefato de produção. */}
           {import.meta.env.DEV ? (
             <details className="demo-access">
               <summary>Credenciais de demonstração</summary>
-              <div>
+              <div className="demo-access__body">
                 <p>
-                  <CheckCircleIcon size={16} weight="fill" />
-                  Médico: carla.nogueira@pad.local
+                  <CheckCircleIcon size={14} weight="fill" aria-hidden="true" />
+                  carla.nogueira@pad.local
                 </p>
                 <p>Senha: Senha@123</p>
               </div>
@@ -186,6 +195,7 @@ export function LoginPage() {
           ) : null}
 
           <p className="login-card__footer">
+            <ShieldCheckIcon size={14} aria-hidden="true" />
             Ambiente protegido. O acesso e as ações são registrados.
           </p>
         </div>

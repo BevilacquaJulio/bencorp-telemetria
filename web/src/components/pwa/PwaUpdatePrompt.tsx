@@ -28,8 +28,8 @@ export function PwaUpdatePrompt() {
   const updateAvailable = notice === 'update-available'
 
   return (
-    <aside className="pwa-notice" role="status" aria-live="polite">
-      <span className="pwa-notice__icon" aria-hidden="true">
+    <aside className="pwa-prompt" role="status" aria-live="polite">
+      <span className="pwa-prompt__icon" aria-hidden="true">
         {updateAvailable ? (
           <ArrowClockwiseIcon size={22} weight="duotone" />
         ) : (
@@ -37,7 +37,7 @@ export function PwaUpdatePrompt() {
         )}
       </span>
 
-      <div className="pwa-notice__content">
+      <div className="pwa-prompt__content">
         <strong>
           {updateAvailable
             ? 'Nova versão disponível'
@@ -49,23 +49,26 @@ export function PwaUpdatePrompt() {
             : 'A interface abre sem conexão. Dados assistenciais continuam disponíveis somente online.'}
         </p>
         {updateAvailable ? (
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => void updateServiceWorker.current(true)}
-          >
-            Atualizar agora
-          </Button>
+          <div className="pwa-prompt__actions">
+            <Button
+              type="button"
+              size="sm"
+              icon={<ArrowClockwiseIcon size={15} />}
+              onClick={() => void updateServiceWorker.current(true)}
+            >
+              Atualizar agora
+            </Button>
+          </div>
         ) : null}
       </div>
 
       <button
         type="button"
-        className="pwa-notice__dismiss"
+        className="icon-button icon-button--sm"
         aria-label="Fechar aviso"
         onClick={() => setNotice(null)}
       >
-        <XIcon size={18} aria-hidden="true" />
+        <XIcon size={15} aria-hidden="true" />
       </button>
     </aside>
   )
