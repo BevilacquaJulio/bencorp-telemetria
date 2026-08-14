@@ -926,6 +926,10 @@
    Modal  (components/ui/Modal.tsx — usa <dialog> nativo)
    ------------------------------------------------------------------------- */
 .modal {
+  /* O <dialog> nativo se centra com `margin: auto` no stylesheet do
+     navegador. O reset do Tailwind zera margin em tudo, então sem
+     devolver o auto o painel nasce no canto superior esquerdo. */
+  margin: auto;
   width: min(560px, calc(100vw - var(--space-8)));
   max-height: calc(100dvh - var(--space-12));
   padding: 0;
