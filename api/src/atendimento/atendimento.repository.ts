@@ -60,29 +60,42 @@ export class AtendimentoRepository {
     // ordena por entrada. Quem chegou primeiro aparece primeiro — a fila não
     // é ordenada por risco de propósito, porque priorizar por gravidade é
     // decisão clínica do profissional, não do ORDER BY.
-    const [itens, total] = await this.prisma.$transaction([
+    const itemSelect = {
+      id: true,
+      status: true,
+      risco: true,
+      entradaFila: true,
+      iniciadoEm: true,
+      paciente: {
+        select: { id: true, nome: true, cpf: true, contato: true },
+      },
+      profissional: { select: { id: true, nome: true } },
+      encaminhadoDeId: true,
+    } satisfies Prisma.AtendimentoSelect;
+
+    const [itens, total, atendimentoAtivo] = await this.prisma.$transaction([
       this.prisma.atendimento.findMany({
         where,
         orderBy: { entradaFila: 'asc' },
         skip: (filtros.pagina - 1) * filtros.porPagina,
         take: filtros.porPagina,
-        select: {
-          id: true,
-          status: true,
-          risco: true,
-          entradaFila: true,
-          iniciadoEm: true,
-          paciente: {
-            select: { id: true, nome: true, cpf: true, contato: true },
-          },
-          profissional: { select: { id: true, nome: true } },
-          encaminhadoDeId: true,
-        },
+        select: itemSelect,
       }),
       this.prisma.atendimento.count({ where }),
+      // O vínculo ativo precisa aparecer mesmo quando a ficha entrou ontem e
+      // a fila está filtrada em "hoje". Sem este destaque independente, o
+      // profissional fica impedido pelo índice único sem enxergar o que deve
+      // retomar e finalizar.
+      this.prisma.atendimento.findFirst({
+        where: {
+          profissionalId: usuario.id,
+          status: StatusAtendimento.EM_ANDAMENTO,
+        },
+        select: itemSelect,
+      }),
     ]);
 
-    return { itens, total };
+    return { itens, total, atendimentoAtivo };
   }
 
   async pacienteExiste(pacienteId: string): Promise<boolean> {

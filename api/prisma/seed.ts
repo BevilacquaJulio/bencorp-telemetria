@@ -278,13 +278,6 @@ const PRONTUARIOS = {
     prescricao:
       'Salbutamol spray, 2 jatos a cada 4h se falta de ar. Retorno imediato se piora.',
   },
-  rascunho: {
-    anamnese:
-      'Paciente com febre e mal-estar há 24h, em avaliação. Aguardando resultado de exames complementares antes de fechar a conduta.',
-    conduta:
-      'Em investigação — nota provisória, prontuário ainda não finalizado.',
-    prescricao: null,
-  },
 } satisfies Record<
   string,
   { anamnese: string; conduta: string; prescricao: string | null }
@@ -298,8 +291,7 @@ const PRONTUARIOS = {
 //
 //  - #3 (AGUARDANDO, já triado, risco alto) é o candidato natural pro teste
 //    de concorrência: dois POST /iniciar simultâneos nele.
-//  - #7 tem prontuário em rascunho (finalizadoEm nulo) — PATCH ainda deve
-//    funcionar.
+//  - #7 está triado e aguardando, pronto para Diego assumir no fluxo médico.
 //  - #10 a #13 têm prontuário finalizado — PATCH neles deve ser recusado
 //    pelo gatilho, e são o par usado pra provar isolamento entre atendimentos
 //    (token da sala de um não pode ser usado no outro).
@@ -422,10 +414,9 @@ const ATENDIMENTOS: AtendimentoSeed[] = [
     comAdendo: false,
   },
 
-  // EM_ANDAMENTO (4) — um por profissional. Dois no mesmo médico quebram o
-  // índice uniq_profissional_atendimento_ativo. Enfermeiro também inicia
-  // atendimento (matriz de acesso), então os quatro usuários clínicos
-  // cobrem os quatro ativos: dois médicos (um com rascunho) e dois enfermeiros.
+  // EM_ANDAMENTO (2) — Carla e Bruno demonstram retomada de atendimento.
+  // Ana e Diego ficam livres para assumir uma nova ficha e executar, em
+  // sequência, triagem/encaminhamento e atendimento médico no ambiente demo.
   {
     id: 'c0000000-0000-4000-8000-000000000006',
     pacienteIndex: 5,
@@ -443,34 +434,34 @@ const ATENDIMENTOS: AtendimentoSeed[] = [
     autorProntuario: null,
     comAdendo: false,
   },
-  // Prontuário ainda rascunho (finalizadoEm nulo) — o caso pra provar que PATCH funciona antes de finalizar.
+  // Triado e aguardando — candidato para Diego assumir no fluxo médico.
   {
     id: 'c0000000-0000-4000-8000-000000000007',
     pacienteIndex: 6,
-    status: StatusAtendimento.EM_ANDAMENTO,
+    status: StatusAtendimento.AGUARDANDO,
     entradaFilaHorasAtras: HOJE + 6,
     risco: Risco.AMARELO,
     triagemAutor: 'bruno',
     triagemHorasAtras: HOJE + 5.5,
-    profissional: 'diego',
-    iniciadoEmHorasAtras: HOJE + 4,
+    profissional: null,
+    iniciadoEmHorasAtras: null,
     finalizadoEmHorasAtras: null,
     canceladoEmHorasAtras: null,
-    prontuario: 'rascunho',
+    prontuario: null,
     prontuarioFinalizado: false,
-    autorProntuario: 'diego',
+    autorProntuario: null,
     comAdendo: false,
   },
   {
     id: 'c0000000-0000-4000-8000-000000000008',
     pacienteIndex: 7,
-    status: StatusAtendimento.EM_ANDAMENTO,
+    status: StatusAtendimento.AGUARDANDO,
     entradaFilaHorasAtras: ONTEM + 6,
     risco: Risco.VERMELHO,
     triagemAutor: 'ana',
     triagemHorasAtras: ONTEM + 5,
-    profissional: 'ana',
-    iniciadoEmHorasAtras: ONTEM + 3,
+    profissional: null,
+    iniciadoEmHorasAtras: null,
     finalizadoEmHorasAtras: null,
     canceladoEmHorasAtras: null,
     prontuario: null,

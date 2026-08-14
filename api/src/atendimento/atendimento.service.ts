@@ -34,10 +34,14 @@ export class AtendimentoService {
   ) {}
 
   async listarFila(filtros: ListarFilaDto, usuario: UsuarioAutenticado) {
-    const { itens, total } = await this.repo.listarFila(filtros, usuario);
+    const { itens, total, atendimentoAtivo } = await this.repo.listarFila(
+      filtros,
+      usuario,
+    );
     return {
       itens,
       total,
+      atendimentoAtivo,
       pagina: filtros.pagina,
       porPagina: filtros.porPagina,
       paginas: Math.ceil(total / filtros.porPagina),
