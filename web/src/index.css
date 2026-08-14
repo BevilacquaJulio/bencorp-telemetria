@@ -1416,6 +1416,82 @@ tbody tr:last-child td {
   animation: spin 700ms linear infinite;
 }
 
+/* PWA */
+
+.pwa-notice {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  width: min(430px, calc(100vw - 2rem));
+  padding: 1rem;
+  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.97);
+  box-shadow: 0 20px 50px rgb(7 42 67 / 0.2);
+  backdrop-filter: blur(14px);
+  align-items: flex-start;
+  animation: pwa-notice-in 320ms var(--ease-out) both;
+}
+
+.pwa-notice__icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  color: var(--brand-teal-700);
+  border: 1px solid #c7e8e6;
+  border-radius: 11px;
+  background: var(--brand-teal-soft);
+  place-items: center;
+}
+
+.pwa-notice__content {
+  min-width: 0;
+}
+
+.pwa-notice__content > strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.pwa-notice__content > p {
+  margin: 0.3rem 0 0.75rem;
+  color: var(--text);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.pwa-notice__dismiss {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  place-items: center;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 150ms var(--ease-out);
+}
+
+@keyframes pwa-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* Patients */
 
 .patients-grid {
@@ -2197,6 +2273,11 @@ tbody tr:last-child td {
     background: #edf5f6;
   }
 
+  .pwa-notice__dismiss:hover {
+    color: var(--brand-blue);
+    background: var(--surface-muted);
+  }
+
   .sidebar-link:hover {
     color: var(--brand-blue);
     background: #f5f9fa;
@@ -2409,6 +2490,11 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 720px) {
+  .pwa-notice {
+    right: 1rem;
+    bottom: 1rem;
+  }
+
   .profile-trigger__text,
   .profile-trigger > svg {
     display: none;

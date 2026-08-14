@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { BrowserRouter } from 'react-router-dom'
+import { PwaUpdatePrompt } from '../components/pwa/PwaUpdatePrompt'
 import { AuthProvider } from '../features/auth/AuthContext'
 import { AppRouter } from './AppRouter'
 
@@ -24,6 +25,7 @@ export function AppProviders() {
       <AuthProvider>
         <BrowserRouter>
           <AppRouter />
+          <PwaUpdatePrompt />
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
