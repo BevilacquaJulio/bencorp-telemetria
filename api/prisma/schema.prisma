@@ -52,6 +52,11 @@ enum Participante {
   PACIENTE
 }
 
+enum TipoTokenSala {
+  ACESSO_LIVEKIT
+  LINK_PACIENTE
+}
+
 // ---------------------------------------------------------------------------
 // Pessoas
 // ---------------------------------------------------------------------------
@@ -65,12 +70,12 @@ model Usuario {
   ativo     Boolean  @default(true)
   criadoEm  DateTime @default(now()) @db.Timestamptz(3)
 
-  atendimentos   Atendimento[]
-  triagens       Triagem[]
-  prontuarios    Prontuario[]
-  adendos        ProntuarioAdendo[]
-  salaTokens     SalaToken[]
-  logsAuditoria  LogAuditoria[]
+  atendimentos  Atendimento[]
+  triagens      Triagem[]
+  prontuarios   Prontuario[]
+  adendos       ProntuarioAdendo[]
+  salaTokens    SalaToken[]
+  logsAuditoria LogAuditoria[]
 }
 
 model Paciente {
@@ -98,7 +103,7 @@ model Atendimento {
   status StatusAtendimento @default(AGUARDANDO)
   risco  Risco?
 
-  pacienteId String @db.Uuid
+  pacienteId     String  @db.Uuid
   // Nulo enquanto AGUARDANDO. Só recebe valor quando um profissional assume,
   // e é esse preenchimento que o índice único parcial vigia.
   profissionalId String? @db.Uuid
@@ -115,8 +120,8 @@ model Atendimento {
   encaminhadoDe   Atendimento? @relation("Encaminhamento", fields: [encaminhadoDeId], references: [id])
   encaminhadoPara Atendimento? @relation("Encaminhamento")
 
-  paciente     Paciente  @relation(fields: [pacienteId], references: [id])
-  profissional Usuario?  @relation(fields: [profissionalId], references: [id])
+  paciente     Paciente @relation(fields: [pacienteId], references: [id])
+  profissional Usuario? @relation(fields: [profissionalId], references: [id])
 
   triagem       Triagem?
   prontuario    Prontuario?
@@ -200,8 +205,9 @@ model SalaToken {
 
   // Só o SHA-256 do token. Se o banco vazar, os tokens não vazam junto —
   // mesmo raciocínio de nunca guardar senha em texto.
-  tokenHash    String       @unique @db.Char(64)
+  tokenHash    String        @unique @db.Char(64)
   participante Participante
+  tipo         TipoTokenSala @default(ACESSO_LIVEKIT)
 
   // Preenchido para profissional; nulo para o paciente, que não tem conta.
   usuarioId String? @db.Uuid
@@ -216,7 +222,7 @@ model SalaToken {
   atendimento Atendimento @relation(fields: [atendimentoId], references: [id])
   usuario     Usuario?    @relation(fields: [usuarioId], references: [id])
 
-  @@index([atendimentoId])
+  @@index([atendimentoId, participante, tipo, revogadoEm])
 }
 
 // ---------------------------------------------------------------------------
@@ -234,8 +240,8 @@ model LogAuditoria {
   pacienteId    String? @db.Uuid
   atendimentoId String? @db.Uuid
 
-  endpoint String @db.VarChar(200)
-  metodo   String @db.VarChar(10)
+  endpoint   String @db.VarChar(200)
+  metodo     String @db.VarChar(10)
   // O acesso negado é o registro mais importante da auditoria, então o 403
   // também é gravado — não só o que deu certo.
   statusHttp Int
