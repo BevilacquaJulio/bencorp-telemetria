@@ -1,12 +1,5 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../validacao/zod-validation.pipe';
 import { AuthService, RespostaDeLogin } from './auth.service';
@@ -24,16 +17,8 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  // Limite aplicado só aqui, e não globalmente: login é a única rota que um
-  // atacante chama em volume (força bruta de senha). Guard global de
-  // throttle atrapalharia o teste de concorrência, que dispara dez
-  // requisições simultâneas de propósito.
-  //
-  // O ThrottlerGuard precisa ser aplicado explicitamente: `ThrottlerModule`
-  // sozinho registra a configuração, não o guard. Sem esta linha o @Throttle
-  // abaixo seria decoração inerte — o tipo de proteção que parece existir no
-  // code review e não existe em produção.
-  @UseGuards(ThrottlerGuard)
+  // O guard agora é global: cobre também o link público do paciente. Esta rota
+  // reduz o limite geral de 100 para 10 tentativas por minuto contra força bruta.
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Autentica e devolve o token de acesso' })
   @ApiResponse({ status: 200, description: 'Autenticado' })

@@ -21,8 +21,7 @@ export class AuditoriaService {
     config: ConfiguracaoAuditavel,
     statusHttp: number,
   ): Promise<void> {
-    const parametro = requisicao.params[config.param];
-    const id = Array.isArray(parametro) ? parametro[0] : parametro;
+    const id = this.identificadorDoRecurso(requisicao, config);
     const contexto =
       id && FORMATO_UUID.test(id)
         ? await this.resolverContexto(config, id)
@@ -36,13 +35,48 @@ export class AuditoriaService {
       atendimentoId: contexto?.atendimentoId ?? null,
       // Query strings podem carregar buscas por CPF ou nome. Para auditoria
       // basta a rota; copiar a consulta criaria um segundo repositório de PII.
-      endpoint: requisicao.path.slice(0, 200),
+      endpoint: this.endpointSeguro(requisicao),
       metodo: requisicao.method.slice(0, 10),
       statusHttp,
       ip: requisicao.ip?.slice(0, 45) ?? null,
       userAgent: requisicao.get('user-agent')?.slice(0, 300) ?? null,
     };
     await this.repo.criar(dados);
+  }
+
+  private identificadorDoRecurso(
+    requisicao: Request,
+    config: ConfiguracaoAuditavel,
+  ): string | undefined {
+    if (config.param) {
+      const parametro = requisicao.params[config.param];
+      return Array.isArray(parametro) ? parametro[0] : parametro;
+    }
+    if (
+      config.bodyField &&
+      typeof requisicao.body === 'object' &&
+      requisicao.body !== null &&
+      config.bodyField in requisicao.body
+    ) {
+      const valor: unknown = (requisicao.body as Record<string, unknown>)[
+        config.bodyField
+      ];
+      return typeof valor === 'string' ? valor : undefined;
+    }
+    return undefined;
+  }
+
+  private endpointSeguro(requisicao: Request): string {
+    const rota: unknown = requisicao.route;
+    if (
+      typeof rota === 'object' &&
+      rota !== null &&
+      'path' in rota &&
+      typeof rota.path === 'string'
+    ) {
+      return `${requisicao.baseUrl}${rota.path}`.slice(0, 200);
+    }
+    return requisicao.path.slice(0, 200);
   }
 
   async listar(filtros: ListarAuditoriaDto) {

@@ -19,6 +19,7 @@ import type { UsuarioAutenticado } from '../common/auth/tipos';
 import type { CriarAtendimentoDto } from './dto/criar-atendimento.schema';
 import type { CriarTriagemDto } from './dto/criar-triagem.schema';
 import type { ListarFilaDto } from './dto/listar-fila.schema';
+import { SalaService } from '../sala/sala.service';
 
 /** Violação de restrição única no Postgres, na numeração do Prisma. */
 const P2002_UNICIDADE = 'P2002';
@@ -27,7 +28,10 @@ const P2002_UNICIDADE = 'P2002';
 export class AtendimentoService {
   private readonly logger = new Logger(AtendimentoService.name);
 
-  constructor(private readonly repo: AtendimentoRepository) {}
+  constructor(
+    private readonly repo: AtendimentoRepository,
+    private readonly sala: SalaService,
+  ) {}
 
   async listarFila(filtros: ListarFilaDto, usuario: UsuarioAutenticado) {
     const { itens, total } = await this.repo.listarFila(filtros, usuario);
@@ -175,6 +179,7 @@ export class AtendimentoService {
         'ATENDIMENTO_ALTERADO',
       );
     }
+    await this.sala.encerrar(id);
     return this.detalhar(id);
   }
 
@@ -211,6 +216,7 @@ export class AtendimentoService {
         'ATENDIMENTO_ALTERADO',
       );
     }
+    await this.sala.encerrar(id);
     return this.detalhar(novoId);
   }
 
