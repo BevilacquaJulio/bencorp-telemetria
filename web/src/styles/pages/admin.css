@@ -94,6 +94,12 @@
   min-height: 34px;
 }
 
+/* O gatilho cabe em 190px; o painel não. Título + descrição na mesma coluna
+   estreita quebram a linha e colidem visualmente com o item seguinte. */
+.user-role-control .menu-panel {
+  min-width: 280px;
+}
+
 /* -------------------------------------------------------------------------
    Cartões de usuário no celular
    ------------------------------------------------------------------------- */

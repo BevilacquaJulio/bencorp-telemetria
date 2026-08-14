@@ -842,10 +842,16 @@
   min-width: 0;
 }
 
+.menu-item__text strong,
+.menu-item__text small {
+  display: block;
+}
+
 .menu-item__text strong {
   color: inherit;
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
 }
 
 .menu-item__text small {
@@ -1642,6 +1648,15 @@
 .data-table td .select {
   position: relative;
   z-index: 2;
+}
+
+/* O z-index: 2 acima cria um stacking context (camada própria) em cada
+   célula. O painel do select tem z-index 70, mas fica preso nessa camada 2:
+   a linha de baixo, também em 2 e depois no DOM, pinta por cima. Resultado:
+   "Enfermagem" do gatilho vizinho aparece em cima das opções. Elevar a
+   linha aberta tira o painel dessa corrida. */
+.data-table tbody tr:has([aria-expanded='true']) {
+  z-index: var(--z-dropdown);
 }
 
 /* Célula de identidade: avatar + nome + documento. */
