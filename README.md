@@ -121,9 +121,18 @@ O Compose executa automaticamente, nesta ordem:
 
 ### Teste da chamada em dois contextos
 
-Para o teste local recomendado, abra o profissional em uma janela normal e o
-convite do paciente em uma janela anônima do mesmo computador. Os valores padrão
-da `.env.example` já atendem esse cenário.
+Para a demonstração local recomendada:
+
+1. Acesse <http://localhost:8080> em uma janela normal e entre como profissional.
+2. Libere câmera e microfone no ícone de permissões do navegador.
+3. Inicie o atendimento, gere o convite e abra-o em uma janela anônima do mesmo navegador.
+4. Libere câmera e microfone também na janela do paciente.
+5. Confirme vídeo, áudio, queda simulada de conexão e o botão **Reconectar** do paciente.
+
+Use duas janelas reais no mesmo computador, não o emulador de iPhone das
+ferramentas do navegador. O emulador altera o viewport, mas não reproduz de
+forma confiável dispositivos de mídia nem a negociação WebRTC. Os valores
+padrão da `.env.example` já atendem o cenário de duas janelas locais.
 
 Para outro computador ou celular, não use `localhost`. O endereço do frontend,
 do LiveKit e o candidato ICE precisam ser alcançáveis pelo segundo dispositivo.
@@ -258,18 +267,22 @@ npm test
 
 ### PWA e instalação
 
-O manifesto e o service worker são gerados apenas no build de produção. Para
-validar a instalação localmente:
+O manifesto e o service worker são gerados apenas no build de produção.
+`npm run dev` serve para desenvolvimento e não demonstra a instalação da PWA.
+
+Para a apresentação ao avaliador, suba o build completo e use sempre:
 
 ```powershell
-cd web
-npm run build
-npm run preview
+docker compose up -d --build
 ```
 
-Abra <http://localhost:4173> e use a opção **Instalar PAD BenCorp** oferecida
-pelo navegador. No ambiente Docker, a mesma validação pode ser feita em
-<http://localhost:8080>.
+Abra <http://localhost:8080> e use a opção **Instalar PAD BenCorp** oferecida
+pelo navegador. Em DevTools, a aba **Application** também deve exibir o
+manifesto e o service worker ativo.
+
+Para validar somente o artefato do frontend, sem o Compose, use
+`npm run build` seguido de `npm run preview -- --port 8080`; a API ainda precisa
+estar disponível em `http://localhost:3000`.
 
 O cache offline contém somente HTML, CSS, JavaScript, fontes e imagens do shell.
 Chamadas `/api`, autenticação, prontuários, pacientes e demais dados
