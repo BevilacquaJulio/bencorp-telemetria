@@ -199,13 +199,16 @@ export class AtendimentoController {
     recurso: 'atendimento',
     param: 'id',
   })
-  @ApiOperation({ summary: 'Finaliza a etapa atual e encaminha para médico' })
+  @ApiOperation({
+    summary: 'Abre ficha médica a partir da etapa de enfermagem',
+  })
   @ApiResponse({ status: 201, description: 'Novo atendimento médico criado' })
   @ApiResponse({ status: 403, description: 'Sem vínculo ou papel inadequado' })
-  @ApiResponse({ status: 409, description: 'Conflito de concorrência' })
+  @ApiResponse({ status: 409, description: 'Já encaminhado ou estado mudou' })
   @ApiResponse({
     status: 422,
-    description: 'Atendimento não está em andamento',
+    description:
+      'Sem triagem, já é etapa médica, ou o status não admite encaminhamento',
   })
   encaminhar(
     @Param('id', ParseUUIDPipe) id: string,

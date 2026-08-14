@@ -91,6 +91,7 @@ export class AtendimentoRepository {
       },
       profissional: { select: { id: true, nome: true } },
       encaminhadoDeId: true,
+      encaminhadoPara: { select: { id: true } },
     } satisfies Prisma.AtendimentoSelect;
 
     // Uma tabulação cruzada em vez de N counts: o serviço deriva qualquer
@@ -349,6 +350,63 @@ export class AtendimentoRepository {
     });
   }
 
+  /**
+   * Encaminha um atendimento já FINALIZADO. Não mexe no status de origem —
+   * FINALIZADO é terminal. Só nasce a ficha médica, e o índice único em
+   * `encaminhadoDeId` impede o segundo encaminhamento.
+   */
+  async encaminharSeFinalizado(
+    id: string,
+    profissionalId: string,
+  ): Promise<string | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const origem = await tx.atendimento.findUnique({
+        where: { id },
+        select: {
+          pacienteId: true,
+          risco: true,
+          status: true,
+          profissionalId: true,
+          encaminhadoDeId: true,
+          triagem: { select: { id: true } },
+          encaminhadoPara: { select: { id: true } },
+        },
+      });
+      if (
+        !origem ||
+        origem.profissionalId !== profissionalId ||
+        origem.status !== StatusAtendimento.FINALIZADO ||
+        origem.encaminhadoDeId ||
+        !origem.triagem ||
+        origem.encaminhadoPara
+      ) {
+        return null;
+      }
+
+      try {
+        const encaminhado = await tx.atendimento.create({
+          data: {
+            pacienteId: origem.pacienteId,
+            risco: origem.risco,
+            encaminhadoDeId: id,
+          },
+          select: { id: true },
+        });
+        return encaminhado.id;
+      } catch (erro) {
+        // O índice único em encaminhadoDeId é quem decide a corrida: a
+        // segunda requisição encontra a linha já criada e perde.
+        if (
+          erro instanceof Prisma.PrismaClientKnownRequestError &&
+          erro.code === 'P2002'
+        ) {
+          return null;
+        }
+        throw erro;
+      }
+    });
+  }
+
   async criarTriagem(
     atendimentoId: string,
     autorId: string,
@@ -422,6 +480,7 @@ export class AtendimentoRepository {
             criadoEm: true,
           },
         },
+        encaminhadoDeId: true,
         encaminhadoDe: {
           select: {
             id: true,
@@ -438,6 +497,7 @@ export class AtendimentoRepository {
             },
           },
         },
+        encaminhadoPara: { select: { id: true } },
       },
     });
   }

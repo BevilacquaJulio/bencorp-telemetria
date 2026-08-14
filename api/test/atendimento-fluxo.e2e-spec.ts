@@ -229,6 +229,30 @@ describe('Fluxo de atendimento (e2e)', () => {
       .set(bearer(tokenEnfermeiro));
     expect(finalizacao.status).toBe(200);
 
+    const encaminhamentoTardio = await request(app.getHttpServer())
+      .post(`/atendimentos/${atendimento.id}/encaminhar`)
+      .set(bearer(tokenEnfermeiro));
+    expect(encaminhamentoTardio.status).toBe(201);
+    const atendimentoMedico = (encaminhamentoTardio.body as { id: string }).id;
+
+    const filaMedica = await request(app.getHttpServer())
+      .get('/atendimentos')
+      .query({ busca: novoCpf })
+      .set(bearer(tokenMedico));
+    expect(
+      (filaMedica.body as { itens: Array<{ id: string }> }).itens.some(
+        ({ id }) => id === atendimentoMedico,
+      ),
+    ).toBe(true);
+
+    const segundoEncaminhamento = await request(app.getHttpServer())
+      .post(`/atendimentos/${atendimento.id}/encaminhar`)
+      .set(bearer(tokenEnfermeiro));
+    expect(segundoEncaminhamento.status).toBe(409);
+    expect((segundoEncaminhamento.body as { codigo: string }).codigo).toBe(
+      'ATENDIMENTO_JA_ENCAMINHADO',
+    );
+
     const duplicado = await request(app.getHttpServer())
       .post('/atendimentos/cadastrar-paciente')
       .set(bearer(tokenEnfermeiro))

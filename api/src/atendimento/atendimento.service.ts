@@ -278,22 +278,65 @@ export class AtendimentoService {
     return this.detalhar(id);
   }
 
+  /**
+   * Encerra a etapa de enfermagem e abre uma ficha nova para o médico.
+   *
+   * Aceita `EM_ANDAMENTO` (fluxo da sala) e `FINALIZADO` com triagem e sem
+   * encaminhamento prévio — a enfermagem pode ter encerrado a videochamada
+   * sem mandar ao médico e ainda assim precisa da ficha médica. Isso não
+   * viola o grafo: `FINALIZADO` continua terminal; o que nasce é outro
+   * atendimento em `AGUARDANDO`.
+   *
+   * @throws TransicaoInvalida quando falta triagem ou o status não admite
+   * @throws ConflitoDeEstado quando já foi encaminhado ou o estado mudou (409)
+   */
   async encaminhar(id: string, profissionalId: string) {
-    const status = await this.exigirStatus(id);
-    if (!transicaoPermitida(status, StatusAtendimento.FINALIZADO)) {
+    const origem = await this.repo.buscarPorId(id);
+    if (!origem) {
+      throw new RecursoNaoEncontrado('Atendimento');
+    }
+
+    if (!origem.triagem) {
       throw new TransicaoInvalida(
-        explicarTransicao(status, StatusAtendimento.FINALIZADO),
+        'O encaminhamento ao médico exige triagem registrada',
+      );
+    }
+    if (origem.encaminhadoDeId) {
+      throw new TransicaoInvalida(
+        'Este atendimento já é a etapa médica e não pode ser encaminhado de novo',
+      );
+    }
+    if (origem.encaminhadoPara) {
+      throw new ConflitoDeEstado(
+        'Este atendimento já foi encaminhado ao médico',
+        'ATENDIMENTO_JA_ENCAMINHADO',
       );
     }
 
-    const novoId = await this.repo.encaminharSeEmAndamento(id, profissionalId);
+    const emAndamento = origem.status === StatusAtendimento.EM_ANDAMENTO;
+    const finalizado = origem.status === StatusAtendimento.FINALIZADO;
+    if (!emAndamento && !finalizado) {
+      throw new TransicaoInvalida(
+        'Só é possível encaminhar um atendimento em andamento ou já finalizado com triagem',
+      );
+    }
+
+    const novoId = emAndamento
+      ? await this.repo.encaminharSeEmAndamento(id, profissionalId)
+      : await this.repo.encaminharSeFinalizado(id, profissionalId);
     if (!novoId) {
       throw new ConflitoDeEstado(
         'O atendimento mudou enquanto estava sendo encaminhado',
         'ATENDIMENTO_ALTERADO',
       );
     }
-    await this.sala.encerrar(id);
+
+    // Sala já foi encerrada na finalização. Chamar de novo no caminho
+    // EM_ANDAMENTO desconecta quem ainda está na chamada; no FINALIZADO o
+    // DeleteRoom é idempotente.
+    if (emAndamento) {
+      await this.sala.encerrar(id);
+    }
     return this.detalhar(novoId);
   }
 
