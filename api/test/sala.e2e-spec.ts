@@ -8,47 +8,17 @@ import { Papel, Participante, TipoTokenSala } from '../generated/prisma/client';
 import { AppModule } from '../src/app.module';
 import { FiltroDeExcecoes } from '../src/common/erros/filtro-excecoes';
 import { PrismaService } from '../src/common/prisma/prisma.service';
-import type { EmitirTokenVideo } from '../src/sala/livekit.provider';
 import { LiveKitProvider } from '../src/sala/livekit.provider';
+import { LiveKitFakeE2e } from './livekit-fake.e2e';
 
 const SENHA = 'Senha@123';
-
-class LiveKitFake {
-  readonly url = 'ws://livekit.fake';
-  readonly salasEncerradas: string[] = [];
-  private sequencia = 0;
-
-  nomeDaSala(atendimentoId: string) {
-    return `atendimento-${atendimentoId}`;
-  }
-
-  identidadeDoProfissional(usuarioId: string) {
-    return `profissional:${usuarioId}`;
-  }
-
-  identidadeDoPaciente(atendimentoId: string) {
-    return `paciente:${atendimentoId}`;
-  }
-
-  emitirToken(dados: EmitirTokenVideo) {
-    this.sequencia += 1;
-    return Promise.resolve(
-      `jwt-fake-${dados.participante}-${this.sequencia}-${randomUUID()}`,
-    );
-  }
-
-  encerrarSala(atendimentoId: string) {
-    this.salasEncerradas.push(atendimentoId);
-    return Promise.resolve();
-  }
-}
 
 type Perfil = 'dono' | 'alheio' | 'admin';
 
 describe('Sala e tokens de vídeo (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
-  let livekit: LiveKitFake;
+  let livekit: LiveKitFakeE2e;
   let pacienteId: string;
   let atendimentoId: string;
   let atendimentoAlheioId: string;
@@ -78,7 +48,7 @@ describe('Sala e tokens de vídeo (e2e)', () => {
   };
 
   beforeAll(async () => {
-    livekit = new LiveKitFake();
+    livekit = new LiveKitFakeE2e();
     const fixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -359,6 +329,15 @@ describe('Sala e tokens de vídeo (e2e)', () => {
   });
 
   it('encaminhamento também encerra a sala de origem', async () => {
+    const triagem = await request(app.getHttpServer())
+      .post(`/atendimentos/${atendimentoAlheioId}/triagem`)
+      .set(bearer('alheio'))
+      .send({
+        risco: 'VERDE',
+        queixa: 'Paciente apto para encaminhamento médico',
+      });
+    expect(triagem.status).toBe(201);
+
     const encaminhamento = await request(app.getHttpServer())
       .post(`/atendimentos/${atendimentoAlheioId}/encaminhar`)
       .set(bearer('alheio'));

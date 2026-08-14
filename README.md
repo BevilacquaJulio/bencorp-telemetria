@@ -67,6 +67,7 @@ navegador uma URL pública separada.
 │   └── Dockerfile
 ├── docs/                       # regras de domínio e decisões técnicas
 ├── docker-compose.yml
+├── docker-compose.test.yml     # PostgreSQL E2E temporário e isolado
 └── .env.example
 ```
 
@@ -239,22 +240,36 @@ npm run test:cov
 
 ### Backend E2E
 
-Os testes E2E escrevem dados. Use um banco exclusivo, nunca um banco real ou o
-banco manual de demonstração. Como proteção adicional, a suíte recusa a
-execução quando o nome do banco não começa com `pad_test`.
+Os testes E2E escrevem dados, mas não exigem que você crie um banco manualmente.
+Com o Docker Desktop em execução, instale as dependências e execute:
 
 ```powershell
-docker exec pad-db psql -U pad -d postgres -c "CREATE DATABASE pad_test;"
-
 cd api
-$env:DATABASE_URL="postgresql://pad:pad@localhost:5432/pad_test?schema=public"
-npx prisma migrate deploy
-npx prisma db seed
-npm run test:e2e -- --runInBand
-Remove-Item Env:DATABASE_URL
+npm ci
+npm run test:e2e:local
 ```
 
-Se `pad_test` já existir, ignore a etapa de criação.
+Esse comando executa o fluxo completo:
+
+1. cria um PostgreSQL temporário em um projeto Compose separado;
+2. cria automaticamente o banco `pad_test` na porta local `5433`;
+3. gera o Prisma Client e aplica migrations e seed do zero;
+4. executa todos os E2E em série;
+5. remove o container e os dados temporários, mesmo se um teste falhar.
+
+O banco `pad` e os containers da demonstração não são reutilizados nem
+interrompidos. Também não é necessário ter `.env` configurado para esse comando.
+Se a porta `5433` estiver ocupada, escolha outra somente para essa execução:
+
+```powershell
+$env:PAD_TEST_PORT="55433"
+npm run test:e2e:local
+Remove-Item Env:PAD_TEST_PORT
+```
+
+O comando de baixo nível `npm run test:e2e` continua disponível para a CI ou
+para ambientes que já forneçam uma `DATABASE_URL` exclusiva. Como proteção, a
+suíte recusa qualquer banco cujo nome não comece com `pad_test`.
 
 ### Frontend
 

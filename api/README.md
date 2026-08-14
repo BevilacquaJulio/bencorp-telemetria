@@ -14,11 +14,16 @@ npx prisma migrate deploy
 npm run db:seed
 npm run start:dev    # http://localhost:3000  — Swagger em /docs
 npm test             # unitários (Jest)
-npm run test:e2e     # E2E; exige DATABASE_URL em um banco pad_test*
+npm run test:e2e:local # cria pad_test temporário, testa e remove tudo
+npm run test:e2e       # baixo nível; exige DATABASE_URL em banco pad_test*
 ```
 
 `npm run db:deploy` aplica migrations e o seed — é o comando do serviço
 `migrate` no Compose, não do container da API em runtime.
+
+Para uma instalação nova, prefira `npm run test:e2e:local`. O executor usa o
+`docker-compose.test.yml` da raiz, não depende do banco `pad` e sempre tenta
+remover o PostgreSQL temporário ao terminar.
 
 ## Onde mexer
 

@@ -199,12 +199,15 @@ dados potencialmente desatualizados ou expostos no dispositivo.
 
 **Decisão:** executar API e frontend em jobs paralelos e construir as imagens
 Docker somente depois que ambos passarem. Os E2E recebem um PostgreSQL exclusivo
-do job, com migrations e seed aplicados do zero.
+do job, com migrations e seed aplicados do zero. Localmente, o comando
+`npm run test:e2e:local` reproduz o mesmo isolamento com um projeto Compose
+separado, armazenamento temporário e limpeza automática ao final.
 
 **Motivo:** falhas de lint, teste ou build aparecem na camada responsável, e os
 testes que escrevem dados nunca compartilham o banco de demonstração. A etapa de
 containers valida que os Dockerfiles continuam reproduzíveis após mudanças nas
-dependências ou no código.
+dependências ou no código. O nome `pad_test` continua obrigatório no guard dos
+E2E, mas sua criação deixou de ser uma etapa manual para quem clona o projeto.
 
 **Trade-off:** construir as três imagens aumenta o tempo do workflow. O custo é
 aceito para a branch principal e pull requests porque a execução local via

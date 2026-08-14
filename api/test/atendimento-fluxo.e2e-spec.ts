@@ -8,6 +8,8 @@ import { Papel } from '../generated/prisma/client';
 import { AppModule } from '../src/app.module';
 import { FiltroDeExcecoes } from '../src/common/erros/filtro-excecoes';
 import { PrismaService } from '../src/common/prisma/prisma.service';
+import { LiveKitProvider } from '../src/sala/livekit.provider';
+import { LiveKitFakeE2e } from './livekit-fake.e2e';
 
 const SENHA = 'Senha@123';
 
@@ -30,7 +32,10 @@ describe('Fluxo de atendimento (e2e)', () => {
   beforeAll(async () => {
     const fixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(LiveKitProvider)
+      .useValue(new LiveKitFakeE2e())
+      .compile();
     app = fixture.createNestApplication();
     app.useGlobalFilters(new FiltroDeExcecoes());
     await app.init();

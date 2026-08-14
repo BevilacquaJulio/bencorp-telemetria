@@ -1,0 +1,27 @@
+services:
+  db-test:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      POSTGRES_USER: pad
+      POSTGRES_PASSWORD: pad
+      POSTGRES_DB: pad_test
+    ports:
+      - "127.0.0.1:${PAD_TEST_PORT:-5433}:5432"
+    # Banco realmente descartável: os dados vivem somente enquanto este
+    # container de teste estiver em execução.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pad -d pad_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    mem_limit: 256m
+    cpus: 0.5
