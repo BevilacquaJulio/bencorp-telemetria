@@ -45,6 +45,21 @@ AGUARDANDO ──────► EM_ANDAMENTO ──────► FINALIZADO
 
 `CANCELADO` só é alcançável a partir de `AGUARDANDO`. `FINALIZADO` e `CANCELADO` são terminais.
 
+## Encerramento da sala LiveKit
+
+A revogação interna é imediata: a mesma transação que muda o atendimento para
+`FINALIZADO` preenche `revogadoEm` em todas as credenciais. Depois do commit, a
+API remove as identidades conhecidas e executa `DeleteRoom`, desconectando quem
+estiver na chamada. Nenhum endpoint emite outra credencial fora de
+`EM_ANDAMENTO`.
+
+No LiveKit Cloud, `RemoveParticipant` também revoga o JWT anterior e impede a
+reconexão. O LiveKit self-hosted não oferece revogação antecipada de JWT; nesse
+modo, `DeleteRoom`, bloqueio de nova emissão e TTL de no máximo 15 minutos são
+as barreiras disponíveis. Essa é uma limitação explícita do provedor, não uma
+promessa escondida da aplicação. Referências: [ciclo de tokens](https://docs.livekit.io/frontends/reference/tokens-grants/#token-lifecycle)
+e [Room Service API](https://docs.livekit.io/reference/other/roomservice-api/).
+
 ## Contrato de erros HTTP
 
 | Código | Significado |

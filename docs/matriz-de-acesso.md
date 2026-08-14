@@ -39,6 +39,7 @@ A matriz foi escrita antes das rotas, de propósito: preencher célula a célula
 | 25 | `GET /atendimentos/:id` — vinculado | 200 | 200 | **403** | 401 |
 | 26 | `GET /atendimentos/:id` — não vinculado | **403** | **403** | **403** | 401 |
 | 27 | `GET /atendimentos/:id` — ainda `AGUARDANDO`, sem profissional | 200 | 200 | **403** | 401 |
+| 28 | `POST /atendimentos/:id/sala/link-paciente` — vinculado | 201 | 201 | **403** | 401 |
 
 ## Decisões que a matriz registra
 
