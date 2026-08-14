@@ -15,7 +15,12 @@ import type {
  * produziriam um card que mostra 3 e uma lista que devolve 5 — o tipo de
  * inconsistência que faz a equipe perder confiança no painel inteiro.
  */
-export type QueueScope = 'todos' | 'aguardando' | 'em-andamento' | 'prioridade'
+export type QueueScope =
+  | 'todos'
+  | 'aguardando'
+  | 'em-andamento'
+  | 'finalizados'
+  | 'prioridade'
 
 export const HIGH_PRIORITY_RISKS: Risco[] = ['VERMELHO', 'LARANJA']
 
@@ -29,6 +34,8 @@ export function scopeToFilters(
       return { status: ['AGUARDANDO'] }
     case 'em-andamento':
       return { status: ['EM_ANDAMENTO'] }
+    case 'finalizados':
+      return { status: ['FINALIZADO'] }
     case 'prioridade':
       return { status: OPEN_STATUSES, risco: HIGH_PRIORITY_RISKS }
     default:
@@ -47,6 +54,7 @@ export const scopeLabels: Record<QueueScope, string> = {
   todos: 'Todos os atendimentos',
   aguardando: 'Aguardando',
   'em-andamento': 'Em atendimento',
+  finalizados: 'Finalizados',
   prioridade: 'Alta prioridade em aberto',
 }
 
