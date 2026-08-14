@@ -21,6 +21,19 @@ export async function exchangePatientLink({
   return data
 }
 
+export async function renewPatientRoomAccess({
+  attendanceId,
+  token,
+}: {
+  attendanceId: string
+  token: string
+}) {
+  const { data } = await api.post<RoomAccess>(`/sala/${attendanceId}/renovar`, {
+    token,
+  })
+  return data
+}
+
 export async function createPatientInvite(attendanceId: string) {
   const { data } = await api.post<PatientInvite>(
     `/atendimentos/${attendanceId}/sala/link-paciente`,

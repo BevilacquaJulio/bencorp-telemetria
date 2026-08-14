@@ -332,6 +332,14 @@
   justify-content: center;
 }
 
+.conference-disconnected--patient > div {
+  max-width: 460px;
+}
+
+.conference-disconnected--patient .button {
+  min-width: 160px;
+}
+
 /* Painel lateral assistencial — rola de forma independente do vídeo. */
 .care-workspace {
   display: flex;
