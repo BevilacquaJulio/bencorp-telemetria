@@ -156,8 +156,12 @@ describe('Fluxo de atendimento (e2e)', () => {
       .set(bearer(tokenEnfermeiro));
     expect(inicioIndevidoEnfermeiro.status).toBe(403);
 
+    // A listagem padrão é a primeira página (20, mais antigos primeiro).
+    // Sem filtro, o encaminhamento recém-criado fica no fim da fila global
+    // e some da página — o teste passaria a medir paginação, não visibilidade.
     const filaMedica = await request(app.getHttpServer())
       .get('/atendimentos')
+      .query({ busca: cpf })
       .set(bearer(tokenMedico));
     expect(
       (filaMedica.body as { itens: Array<{ id: string }> }).itens.some(
