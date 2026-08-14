@@ -2,6 +2,11 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { Papel } from '../../../../generated/prisma/client';
+import {
+  CHAVE_AUDITAVEL,
+  type ConfiguracaoAuditavel,
+} from '../../auditoria/auditavel.decorator';
+import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { AcessoNegado } from '../../erros/erros';
 import { CHAVE_PUBLICO } from '../decorators/publico.decorator';
 import { CHAVE_PAPEIS } from '../decorators/papeis.decorator';
@@ -19,9 +24,12 @@ import { UsuarioAutenticado } from '../tipos';
  */
 @Injectable()
 export class PapelGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
-  canActivate(contexto: ExecutionContext): boolean {
+  async canActivate(contexto: ExecutionContext): Promise<boolean> {
     const publica = this.reflector.getAllAndOverride<boolean>(CHAVE_PUBLICO, [
       contexto.getHandler(),
       contexto.getClass(),
@@ -36,6 +44,7 @@ export class PapelGuard implements CanActivate {
     );
 
     if (!papeis || papeis.length === 0) {
+      await this.registrarNegado(contexto);
       throw new AcessoNegado('Rota sem papel declarado');
     }
 
@@ -45,9 +54,21 @@ export class PapelGuard implements CanActivate {
     const usuario = requisicao.user;
 
     if (!usuario || !papeis.includes(usuario.papel)) {
+      await this.registrarNegado(contexto);
       throw new AcessoNegado('Seu papel não tem acesso a esta rota');
     }
 
     return true;
+  }
+
+  private async registrarNegado(contexto: ExecutionContext): Promise<void> {
+    const config = this.reflector.getAllAndOverride<
+      ConfiguracaoAuditavel | undefined
+    >(CHAVE_AUDITAVEL, [contexto.getHandler(), contexto.getClass()]);
+    if (!config) {
+      return;
+    }
+    const requisicao = contexto.switchToHttp().getRequest<Request>();
+    await this.auditoria.registrar(requisicao, config, 403);
   }
 }

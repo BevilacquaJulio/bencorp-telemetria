@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AtendimentoModule } from './atendimento/atendimento.module';
 import { AuthModule } from './common/auth/auth.module';
+import { AuditoriaInterceptor } from './common/auditoria/auditoria.interceptor';
+import { AuditoriaModule } from './common/auditoria/auditoria.module';
 import { EscopoGuard } from './common/auth/guards/escopo.guard';
 import { JwtAuthGuard } from './common/auth/guards/jwt-auth.guard';
 import { PapelGuard } from './common/auth/guards/papel.guard';
@@ -11,6 +13,9 @@ import { FiltroDeExcecoes } from './common/erros/filtro-excecoes';
 import { validarAmbiente } from './config/ambiente';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { SaudeController } from './saude.controller';
+import { ProntuarioModule } from './prontuario/prontuario.module';
+import { PacienteModule } from './paciente/paciente.module';
+import { UsuarioModule } from './usuario/usuario.module';
 
 @Module({
   imports: [
@@ -21,7 +26,11 @@ import { SaudeController } from './saude.controller';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
     AuthModule,
+    AuditoriaModule,
     AtendimentoModule,
+    ProntuarioModule,
+    PacienteModule,
+    UsuarioModule,
   ],
   controllers: [SaudeController],
   providers: [
@@ -38,6 +47,7 @@ import { SaudeController } from './saude.controller';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PapelGuard },
     { provide: APP_GUARD, useClass: EscopoGuard },
+    { provide: APP_INTERCEPTOR, useClass: AuditoriaInterceptor },
     { provide: APP_FILTER, useClass: FiltroDeExcecoes },
   ],
 })

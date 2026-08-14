@@ -1,7 +1,12 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { StatusAtendimento } from '../../../../generated/prisma/client';
+import { Papel, StatusAtendimento } from '../../../../generated/prisma/client';
+import {
+  CHAVE_AUDITAVEL,
+  type ConfiguracaoAuditavel,
+} from '../../auditoria/auditavel.decorator';
+import { AuditoriaService } from '../../auditoria/auditoria.service';
 import { AcessoNegado } from '../../erros/erros';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -30,6 +35,7 @@ export class EscopoGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async canActivate(contexto: ExecutionContext): Promise<boolean> {
@@ -52,24 +58,39 @@ export class EscopoGuard implements CanActivate {
       throw new AcessoNegado();
     }
 
-    const id = requisicao.params[config.param];
-    if (!id) {
-      throw new AcessoNegado('Recurso não identificado na rota');
-    }
+    try {
+      const id = requisicao.params[config.param];
+      if (!id) {
+        throw new AcessoNegado('Recurso não identificado na rota');
+      }
 
-    // Guard roda antes dos pipes no ciclo do Nest, então o ParseUUIDPipe do
-    // controller ainda não validou nada. Sem esta checagem, `/atendimentos/abc`
-    // chegaria ao Prisma com um uuid inválido e viraria 500 — erro de
-    // servidor para o que é, na verdade, entrada malformada do cliente.
-    if (!FORMATO_UUID.test(id)) {
-      throw new AcessoNegado();
-    }
+      // Guard roda antes dos pipes no ciclo do Nest, então o ParseUUIDPipe do
+      // controller ainda não validou nada. Sem esta checagem, `/atendimentos/abc`
+      // chegaria ao Prisma com um uuid inválido e viraria 500 — erro de
+      // servidor para o que é, na verdade, entrada malformada do cliente.
+      if (!FORMATO_UUID.test(id)) {
+        throw new AcessoNegado();
+      }
 
-    if (config.tipo === 'atendimento') {
-      return this.verificarAtendimento(id, usuario, config);
-    }
+      if (config.tipo === 'atendimento') {
+        return await this.verificarAtendimento(id, usuario, config);
+      }
 
-    return false;
+      if (config.tipo === 'prontuario') {
+        return await this.verificarProntuario(id, usuario);
+      }
+
+      if (config.tipo === 'paciente') {
+        return await this.verificarPaciente(id, usuario);
+      }
+
+      return false;
+    } catch (erro) {
+      if (erro instanceof AcessoNegado) {
+        await this.registrarNegado(contexto, requisicao);
+      }
+      throw erro;
+    }
   }
 
   private async verificarAtendimento(
@@ -79,7 +100,7 @@ export class EscopoGuard implements CanActivate {
   ): Promise<boolean> {
     const atendimento = await this.prisma.atendimento.findUnique({
       where: { id },
-      select: { profissionalId: true, status: true },
+      select: { profissionalId: true, status: true, encaminhadoDeId: true },
     });
 
     // Inexistente também é 403, não 404. Responder 404 aqui transformaria a
@@ -96,7 +117,8 @@ export class EscopoGuard implements CanActivate {
     if (atendimento.profissionalId === null) {
       if (
         config.permitirSemVinculo &&
-        atendimento.status === StatusAtendimento.AGUARDANDO
+        atendimento.status === StatusAtendimento.AGUARDANDO &&
+        !(usuario.papel === Papel.ENFERMEIRO && atendimento.encaminhadoDeId)
       ) {
         return true;
       }
@@ -108,5 +130,60 @@ export class EscopoGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  private async verificarProntuario(
+    id: string,
+    usuario: UsuarioAutenticado,
+  ): Promise<boolean> {
+    const prontuario = await this.prisma.prontuario.findUnique({
+      where: { id },
+      select: { atendimento: { select: { profissionalId: true } } },
+    });
+    if (!prontuario || prontuario.atendimento.profissionalId !== usuario.id) {
+      throw new AcessoNegado();
+    }
+    return true;
+  }
+
+  private async verificarPaciente(
+    id: string,
+    usuario: UsuarioAutenticado,
+  ): Promise<boolean> {
+    const paciente = await this.prisma.paciente.findFirst({
+      where: {
+        id,
+        atendimentos: {
+          some: {
+            OR: [
+              { profissionalId: usuario.id },
+              {
+                status: StatusAtendimento.AGUARDANDO,
+                ...(usuario.papel === Papel.ENFERMEIRO
+                  ? { encaminhadoDeId: null }
+                  : {}),
+              },
+            ],
+          },
+        },
+      },
+      select: { id: true },
+    });
+    if (!paciente) {
+      throw new AcessoNegado();
+    }
+    return true;
+  }
+
+  private async registrarNegado(
+    contexto: ExecutionContext,
+    requisicao: Request,
+  ): Promise<void> {
+    const config = this.reflector.getAllAndOverride<
+      ConfiguracaoAuditavel | undefined
+    >(CHAVE_AUDITAVEL, [contexto.getHandler(), contexto.getClass()]);
+    if (config) {
+      await this.auditoria.registrar(requisicao, config, 403);
+    }
   }
 }

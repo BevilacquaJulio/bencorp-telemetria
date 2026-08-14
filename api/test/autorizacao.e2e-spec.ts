@@ -32,6 +32,7 @@ type Conta = keyof typeof CONTAS;
 
 // Ids fixos do seed. Ver prisma/seed.ts.
 const ATENDIMENTO_DA_CARLA = 'c0000000-0000-4000-8000-000000000006'; // EM_ANDAMENTO
+const ATENDIMENTO_DO_DIEGO = 'c0000000-0000-4000-8000-000000000007'; // prontuário rascunho
 const ATENDIMENTO_NA_FILA = 'c0000000-0000-4000-8000-000000000001'; // AGUARDANDO
 const ATENDIMENTO_CANCELADO = 'c0000000-0000-4000-8000-000000000014'; // sem profissional
 const ATENDIMENTO_INEXISTENTE = 'c0000000-0000-4000-8000-0000000000ff';
@@ -157,6 +158,112 @@ describe('Matriz de autorização (e2e)', () => {
       conta: 'ADMIN',
       rota: '/atendimentos',
       esperado: 403,
+    },
+
+    // Linhas 10, 11 e 14 — dado clínico exige papel e escopo.
+    {
+      descricao: 'prontuário / anônimo',
+      conta: 'ANONIMO',
+      rota: `/atendimentos/${ATENDIMENTO_DO_DIEGO}/prontuario`,
+      esperado: 401,
+    },
+    {
+      descricao: 'prontuário / enfermeiro',
+      conta: 'ENFERMEIRO',
+      rota: `/atendimentos/${ATENDIMENTO_DO_DIEGO}/prontuario`,
+      esperado: 403,
+    },
+    {
+      descricao: 'prontuário / admin',
+      conta: 'ADMIN',
+      rota: `/atendimentos/${ATENDIMENTO_DO_DIEGO}/prontuario`,
+      esperado: 403,
+    },
+    {
+      descricao: 'prontuário / médico vinculado',
+      conta: 'MEDICO_ALHEIO',
+      rota: `/atendimentos/${ATENDIMENTO_DO_DIEGO}/prontuario`,
+      esperado: 200,
+    },
+    {
+      descricao: 'prontuário / médico não vinculado',
+      conta: 'MEDICO',
+      rota: `/atendimentos/${ATENDIMENTO_DO_DIEGO}/prontuario`,
+      esperado: 403,
+    },
+    {
+      descricao: 'pacientes / enfermeiro',
+      conta: 'ENFERMEIRO',
+      rota: '/pacientes',
+      esperado: 200,
+    },
+    {
+      descricao: 'pacientes / médico',
+      conta: 'MEDICO',
+      rota: '/pacientes',
+      esperado: 200,
+    },
+    {
+      descricao: 'pacientes / admin',
+      conta: 'ADMIN',
+      rota: '/pacientes',
+      esperado: 403,
+    },
+    {
+      descricao: 'pacientes / anônimo',
+      conta: 'ANONIMO',
+      rota: '/pacientes',
+      esperado: 401,
+    },
+
+    // Linhas 21 e 24 — área administrativa sem conteúdo clínico.
+    {
+      descricao: 'usuários / admin',
+      conta: 'ADMIN',
+      rota: '/usuarios',
+      esperado: 200,
+    },
+    {
+      descricao: 'usuários / enfermeiro',
+      conta: 'ENFERMEIRO',
+      rota: '/usuarios',
+      esperado: 403,
+    },
+    {
+      descricao: 'usuários / médico',
+      conta: 'MEDICO',
+      rota: '/usuarios',
+      esperado: 403,
+    },
+    {
+      descricao: 'usuários / anônimo',
+      conta: 'ANONIMO',
+      rota: '/usuarios',
+      esperado: 401,
+    },
+    {
+      descricao: 'auditoria / admin',
+      conta: 'ADMIN',
+      rota: '/auditoria',
+      esperado: 200,
+    },
+    {
+      descricao: 'auditoria / enfermeiro',
+      conta: 'ENFERMEIRO',
+      rota: '/auditoria',
+      esperado: 403,
+    },
+    {
+      descricao: 'auditoria / médico',
+      conta: 'MEDICO',
+      rota: '/auditoria',
+      esperado: 403,
+    },
+    {
+      descricao: 'auditoria / anônimo',
+      conta: 'ANONIMO',
+      rota: '/auditoria',
+      esperado: 401,
     },
 
     // Linhas 25 a 27 — detalhe do atendimento, escopo por vínculo.
