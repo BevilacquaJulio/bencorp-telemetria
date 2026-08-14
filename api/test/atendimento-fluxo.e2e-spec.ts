@@ -180,6 +180,65 @@ describe('Fluxo de atendimento (e2e)', () => {
     expect(detalhe.encaminhadoDe.triagem.queixa).toContain('Dor torácica');
   });
 
+  it('cadastra uma nova pessoa na fila e inicia a triagem depois', async () => {
+    const novoCpf = `8${randomInt(10_000_000_000).toString().padStart(10, '0')}`;
+    const cadastro = {
+      nome: 'Paciente cadastrado no acolhimento',
+      cpf: novoCpf,
+      contato: '(11) 98888-7777',
+      nascimento: '1992-04-20',
+    };
+
+    const acessoMedico = await request(app.getHttpServer())
+      .post('/atendimentos/cadastrar-paciente')
+      .set(bearer(tokenMedico))
+      .send(cadastro);
+    expect(acessoMedico.status).toBe(403);
+
+    const abertura = await request(app.getHttpServer())
+      .post('/atendimentos/cadastrar-paciente')
+      .set(bearer(tokenEnfermeiro))
+      .send(cadastro);
+    expect(abertura.status).toBe(201);
+    const atendimento = abertura.body as {
+      id: string;
+      status: string;
+      iniciadoEm: string | null;
+      profissional: { id: string } | null;
+      paciente: { cpf: string };
+    };
+    expect(atendimento.status).toBe('AGUARDANDO');
+    expect(atendimento.iniciadoEm).toBeNull();
+    expect(atendimento.profissional).toBeNull();
+    expect(atendimento.paciente.cpf).toBe(novoCpf);
+
+    const inicio = await request(app.getHttpServer())
+      .post(`/atendimentos/${atendimento.id}/iniciar`)
+      .set(bearer(tokenEnfermeiro));
+    expect(inicio.status).toBe(201);
+    expect((inicio.body as { status: string }).status).toBe('EM_ANDAMENTO');
+
+    const triagem = await request(app.getHttpServer())
+      .post(`/atendimentos/${atendimento.id}/triagem`)
+      .set(bearer(tokenEnfermeiro))
+      .send({ risco: 'VERDE', queixa: 'Avaliação inicial de acolhimento' });
+    expect(triagem.status).toBe(201);
+
+    const finalizacao = await request(app.getHttpServer())
+      .post(`/atendimentos/${atendimento.id}/finalizar`)
+      .set(bearer(tokenEnfermeiro));
+    expect(finalizacao.status).toBe(200);
+
+    const duplicado = await request(app.getHttpServer())
+      .post('/atendimentos/cadastrar-paciente')
+      .set(bearer(tokenEnfermeiro))
+      .send(cadastro);
+    expect(duplicado.status).toBe(409);
+    expect((duplicado.body as { codigo: string }).codigo).toBe(
+      'PACIENTE_JA_CADASTRADO',
+    );
+  });
+
   it('o banco recusa transição que ignore o grafo de estados', async () => {
     const atendimento = await prisma.atendimento.create({
       data: { pacienteId },

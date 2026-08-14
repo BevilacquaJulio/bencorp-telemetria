@@ -23,6 +23,8 @@ import { UsuarioAtual } from '../common/auth/decorators/usuario-atual.decorator'
 import type { UsuarioAutenticado } from '../common/auth/tipos';
 import { ZodValidationPipe } from '../common/validacao/zod-validation.pipe';
 import { AtendimentoService } from './atendimento.service';
+import type { CadastrarPacienteDto } from './dto/cadastrar-paciente.schema';
+import { cadastrarPacienteSchema } from './dto/cadastrar-paciente.schema';
 import type { CriarAtendimentoDto } from './dto/criar-atendimento.schema';
 import { criarAtendimentoSchema } from './dto/criar-atendimento.schema';
 import type { CriarTriagemDto } from './dto/criar-triagem.schema';
@@ -73,6 +75,27 @@ export class AtendimentoController {
     dto: CriarAtendimentoDto,
   ) {
     return this.service.criar(dto);
+  }
+
+  @Post('cadastrar-paciente')
+  @Papeis(Papel.ENFERMEIRO)
+  @Auditavel({
+    acao: 'PACIENTE_CADASTRO_COM_FILA',
+    recurso: 'atendimento',
+    param: 'id',
+  })
+  @ApiOperation({
+    summary: 'Cadastra o paciente e o inclui na fila de atendimento',
+  })
+  @ApiResponse({ status: 201, description: 'Paciente e atendimento criados' })
+  @ApiResponse({ status: 400, description: 'Dados pessoais inválidos' })
+  @ApiResponse({ status: 403, description: 'Apenas enfermagem pode cadastrar' })
+  @ApiResponse({ status: 409, description: 'CPF já cadastrado' })
+  cadastrarPaciente(
+    @Body(new ZodValidationPipe(cadastrarPacienteSchema))
+    dto: CadastrarPacienteDto,
+  ) {
+    return this.service.cadastrarPaciente(dto);
   }
 
   // `permitirSemVinculo` porque o profissional precisa abrir o atendimento da

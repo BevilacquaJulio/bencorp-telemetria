@@ -6,6 +6,7 @@ import {
 } from '../../generated/prisma/client';
 import type { UsuarioAutenticado } from '../common/auth/tipos';
 import { PrismaService } from '../common/prisma/prisma.service';
+import type { CadastrarPacienteDto } from './dto/cadastrar-paciente.schema';
 import type { CriarAtendimentoDto } from './dto/criar-atendimento.schema';
 import type { CriarTriagemDto } from './dto/criar-triagem.schema';
 import type { ListarFilaDto } from './dto/listar-fila.schema';
@@ -104,6 +105,38 @@ export class AtendimentoRepository {
       select: { id: true },
     });
     return paciente !== null;
+  }
+
+  async pacienteExistePorCpf(cpf: string): Promise<boolean> {
+    const paciente = await this.prisma.paciente.findUnique({
+      where: { cpf },
+      select: { id: true },
+    });
+    return paciente !== null;
+  }
+
+  async cadastrarPacienteComAtendimento(
+    dto: CadastrarPacienteDto,
+  ): Promise<string> {
+    return this.prisma.$transaction(async (tx) => {
+      const paciente = await tx.paciente.create({
+        data: {
+          nome: dto.nome,
+          cpf: dto.cpf,
+          contato: dto.contato,
+          nascimento: dto.nascimento,
+        },
+        select: { id: true },
+      });
+      const atendimento = await tx.atendimento.create({
+        data: {
+          pacienteId: paciente.id,
+          status: StatusAtendimento.AGUARDANDO,
+        },
+        select: { id: true },
+      });
+      return atendimento.id;
+    });
   }
 
   async criar(dto: CriarAtendimentoDto): Promise<string> {

@@ -16,6 +16,7 @@ import {
   transicaoPermitida,
 } from './dominio/maquina-estados';
 import type { UsuarioAutenticado } from '../common/auth/tipos';
+import type { CadastrarPacienteDto } from './dto/cadastrar-paciente.schema';
 import type { CriarAtendimentoDto } from './dto/criar-atendimento.schema';
 import type { CriarTriagemDto } from './dto/criar-triagem.schema';
 import type { ListarFilaDto } from './dto/listar-fila.schema';
@@ -54,6 +55,31 @@ export class AtendimentoService {
     }
     const id = await this.repo.criar(dto);
     return this.detalhar(id);
+  }
+
+  async cadastrarPaciente(dto: CadastrarPacienteDto) {
+    if (await this.repo.pacienteExistePorCpf(dto.cpf)) {
+      throw new ConflitoDeEstado(
+        'Já existe uma pessoa cadastrada com este CPF',
+        'PACIENTE_JA_CADASTRADO',
+      );
+    }
+
+    try {
+      const id = await this.repo.cadastrarPacienteComAtendimento(dto);
+      return this.detalhar(id);
+    } catch (erro) {
+      if (
+        erro instanceof Prisma.PrismaClientKnownRequestError &&
+        erro.code === P2002_UNICIDADE
+      ) {
+        throw new ConflitoDeEstado(
+          'Já existe uma pessoa cadastrada com este CPF',
+          'PACIENTE_JA_CADASTRADO',
+        );
+      }
+      throw erro;
+    }
   }
 
   async detalhar(id: string) {
