@@ -14,17 +14,19 @@ import {
 } from '../../../components/ui/DataState'
 import { getApiErrorMessage } from '../../../lib/api'
 import { formatCpf, formatDate, initials } from '../../../lib/format'
+import { useAuth } from '../../auth/auth-context'
 import { CareTimelineEntry } from '../components/CareTimelineEntry'
 import { getPatient } from '../pacientes.api'
 
 export function PatientDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const patient = useQuery({
-    queryKey: ['patient', id],
+    queryKey: ['patient', user?.id, id],
     queryFn: () => getPatient(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(user?.id),
   })
 
   if (patient.isLoading) return <TableSkeleton rows={7} />
@@ -61,10 +63,12 @@ export function PatientDetailPage() {
           <span className="patient-profile__avatar" aria-hidden="true">
             {initials(nome)}
           </span>
-          <div>
+          <div className="patient-profile__copy">
             <p>Detalhes do paciente</p>
             <h1>{nome}</h1>
-            <span>Acesso autorizado para o seu perfil profissional.</span>
+            <p className="patient-profile__status">
+              Acesso autorizado para o seu perfil profissional.
+            </p>
           </div>
         </div>
 

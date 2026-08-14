@@ -9,17 +9,20 @@ import {
 import { Pagination } from '../../../components/ui/Pagination'
 import { SearchInput } from '../../../components/ui/SearchInput'
 import { getApiErrorMessage } from '../../../lib/api'
+import { useAuth } from '../../auth/auth-context'
 import { PatientCard } from '../components/PatientCard'
 import { listPatients } from '../pacientes.api'
 
 export function PatientsPage() {
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
   const [page, setPage] = useState(1)
 
   const patients = useQuery({
-    queryKey: ['patients', deferredSearch, page],
+    queryKey: ['patients', user?.id, deferredSearch, page],
     queryFn: () => listPatients(deferredSearch, page),
+    enabled: Boolean(user?.id),
   })
 
   const items = patients.data?.itens ?? []

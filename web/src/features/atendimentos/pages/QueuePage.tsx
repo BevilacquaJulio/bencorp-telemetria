@@ -82,8 +82,11 @@ export function QueuePage() {
   }
 
   const queue = useQuery({
-    queryKey: ['queue', filters],
+    // O id do profissional entra na chave para um GET atrasado da sessão
+    // anterior não gravar a fila da Ana em cima da do Bruno.
+    queryKey: ['queue', user?.id, filters],
     queryFn: () => listQueue(filters),
+    enabled: Boolean(user?.id),
     // Fila é dado que envelhece rápido: outro profissional pode assumir um
     // paciente enquanto esta aba está aberta.
     refetchInterval: 30_000,

@@ -21,6 +21,7 @@ import { Select } from '../../../components/ui/Select'
 import { useToast } from '../../../components/ui/toast-context'
 import { getApiErrorMessage } from '../../../lib/api'
 import { formatDate } from '../../../lib/format'
+import { useAuth } from '../../auth/auth-context'
 import type { Papel } from '../../auth/auth.types'
 import { UserCreatePanel } from '../components/UserCreatePanel'
 import { UserRoleControl } from '../components/UserRoleControl'
@@ -30,6 +31,7 @@ import type { UserListItem } from '../usuarios.types'
 
 export function UsersPage() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const { notify } = useToast()
 
   const [search, setSearch] = useState('')
@@ -40,8 +42,9 @@ export function UsersPage() {
   const [togglingUser, setTogglingUser] = useState<UserListItem | null>(null)
 
   const users = useQuery({
-    queryKey: ['users', deferredSearch, role, page],
+    queryKey: ['users', user?.id, deferredSearch, role, page],
     queryFn: () => listUsers(deferredSearch, role, page),
+    enabled: Boolean(user?.id),
   })
 
   const activeMutation = useMutation({

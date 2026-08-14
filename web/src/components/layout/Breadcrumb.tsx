@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 
@@ -19,10 +20,7 @@ export function Breadcrumb({ items }: { items: Crumb[] }) {
         const isLast = index === items.length - 1
 
         return (
-          <span
-            className="breadcrumb__item"
-            key={`${item.label}-${item.to ?? 'atual'}`}
-          >
+          <Fragment key={`${item.label}-${item.to ?? 'atual'}`}>
             {index > 0 ? (
               <CaretRightIcon
                 className="breadcrumb__separator"
@@ -38,7 +36,7 @@ export function Breadcrumb({ items }: { items: Crumb[] }) {
                 {item.label}
               </span>
             )}
-          </span>
+          </Fragment>
         )
       })}
     </nav>

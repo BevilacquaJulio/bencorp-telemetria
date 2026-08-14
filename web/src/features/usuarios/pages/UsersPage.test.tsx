@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '../../../components/ui/ToastProvider'
+import { AuthContext, type AuthContextValue } from '../../auth/auth-context'
 import {
   createUser,
   listUsers,
@@ -41,6 +42,18 @@ const response: UsersResponse = {
   paginas: 1,
 }
 
+const adminAuth: AuthContextValue = {
+  user: {
+    id: 'admin-1',
+    nome: 'Administrador PAD',
+    email: 'admin@pad.local',
+    papel: 'ADMIN',
+  },
+  token: 'token-teste',
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+}
+
 function renderUsers() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -48,9 +61,11 @@ function renderUsers() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <UsersPage />
-      </ToastProvider>
+      <AuthContext.Provider value={adminAuth}>
+        <ToastProvider>
+          <UsersPage />
+        </ToastProvider>
+      </AuthContext.Provider>
     </QueryClientProvider>,
   )
 }

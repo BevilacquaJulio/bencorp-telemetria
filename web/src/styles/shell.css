@@ -334,10 +334,18 @@
 
 .breadcrumb {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
   color: var(--text-muted);
   font-size: var(--text-xs);
+  line-height: 1;
+}
+
+.breadcrumb a,
+.breadcrumb__current {
+  display: inline-flex;
+  align-items: center;
 }
 
 .breadcrumb a:hover {
@@ -347,6 +355,9 @@
 }
 
 .breadcrumb__separator {
+  /* Irmão no flex, não filho do rótulo. Em base.css o svg é `display: block`;
+     dentro do mesmo span de "Detalhes" o chevron ia para a linha de cima. */
+  flex-shrink: 0;
   color: var(--text-faint);
 }
 

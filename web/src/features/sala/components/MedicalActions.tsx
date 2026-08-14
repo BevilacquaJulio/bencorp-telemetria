@@ -15,6 +15,7 @@ import { ErrorState, TableSkeleton } from '../../../components/ui/DataState'
 import { TextAreaField } from '../../../components/ui/FormField'
 import { useToast } from '../../../components/ui/toast-context'
 import { getApiErrorMessage } from '../../../lib/api'
+import { useAuth } from '../../auth/auth-context'
 import { finalizeAttendance } from '../../atendimentos/atendimentos.api'
 import type { AttendanceDetail } from '../../atendimentos/atendimentos.types'
 import {
@@ -46,12 +47,14 @@ function toInput(values: MedicalRecordForm): MedicalRecordInput {
 
 export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const { notify } = useToast()
   const [confirmingFinish, setConfirmingFinish] = useState(false)
 
   const recordQuery = useQuery({
-    queryKey: ['medical-record', attendance.id],
+    queryKey: ['medical-record', user?.id, attendance.id],
     queryFn: () => getMedicalRecord(attendance.id),
+    enabled: Boolean(user?.id),
   })
 
   const {
@@ -75,7 +78,10 @@ export function MedicalActions({ attendance, onComplete }: MedicalActionsProps) 
   }, [recordQuery.data, reset])
 
   function cacheRecord(record: MedicalRecord) {
-    queryClient.setQueryData(['medical-record', attendance.id], record)
+    queryClient.setQueryData(
+      ['medical-record', user?.id, attendance.id],
+      record,
+    )
   }
 
   async function persistRecord(values: MedicalRecordForm) {
