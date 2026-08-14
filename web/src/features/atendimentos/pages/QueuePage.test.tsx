@@ -250,6 +250,24 @@ describe('QueuePage', () => {
     )
   })
 
+  it('permite filtrar a fila pelos atendimentos cancelados', async () => {
+    const user = userEvent.setup()
+    mockedListQueue.mockResolvedValue(queueResponse([]))
+    renderQueue()
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Filtrar por situação' }),
+    )
+    await user.click(screen.getByRole('option', { name: 'Cancelados' }))
+
+    expect(mockedListQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: ['CANCELADO'],
+        pagina: 1,
+      }),
+    )
+  })
+
   it('leva ao histórico do paciente pelo nome na fila', async () => {
     const user = userEvent.setup()
     mockedListQueue.mockResolvedValue(queueResponse([waitingAttendance]))
