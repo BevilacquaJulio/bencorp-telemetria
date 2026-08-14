@@ -179,3 +179,33 @@ a mesma linha major esperada pelo pacote.
 **Trade-off:** o override deve ser removido quando o Swagger atualizar sua
 dependência. Build, testes e `npm audit --omit=dev` fazem parte da verificação
 para detectar incompatibilidade ou regressão.
+
+## 16. PWA com cache exclusivo do shell
+
+**Decisão:** gerar manifesto e service worker com `vite-plugin-pwa`, usando
+precache apenas para arquivos estáticos versionados e `NetworkOnly` para a API.
+
+**Motivo:** a instalação melhora acesso e experiência em dispositivos móveis,
+mas respostas clínicas e autenticadas não devem ser copiadas para o Cache
+Storage sem uma arquitetura offline, criptografia e política de sincronização
+deliberadas.
+
+**Trade-off:** a interface pode abrir sem rede, porém fila, pacientes,
+prontuários, autenticação e sala continuam indisponíveis até a conexão voltar.
+Essa limitação é intencional e evita apresentar disponibilidade aparente com
+dados potencialmente desatualizados ou expostos no dispositivo.
+
+## 17. CI separada por camada e banco E2E descartável
+
+**Decisão:** executar API e frontend em jobs paralelos e construir as imagens
+Docker somente depois que ambos passarem. Os E2E recebem um PostgreSQL exclusivo
+do job, com migrations e seed aplicados do zero.
+
+**Motivo:** falhas de lint, teste ou build aparecem na camada responsável, e os
+testes que escrevem dados nunca compartilham o banco de demonstração. A etapa de
+containers valida que os Dockerfiles continuam reproduzíveis após mudanças nas
+dependências ou no código.
+
+**Trade-off:** construir as três imagens aumenta o tempo do workflow. O custo é
+aceito para a branch principal e pull requests porque a execução local via
+Docker é parte obrigatória da entrega.

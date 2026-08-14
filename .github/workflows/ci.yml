@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API — lint, testes e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pad
+          POSTGRES_PASSWORD: pad
+          POSTGRES_DB: pad_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pad -d pad_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    env:
+      DATABASE_URL: postgresql://pad:pad@localhost:5432/pad_test?schema=public
+      JWT_SECRET: segredo-ci-com-pelo-menos-32-caracteres
+      JWT_EXPIRES_IN: 1h
+      SALA_TOKEN_TTL_SEG: 900
+      LIVEKIT_URL: ws://localhost:7880
+      LIVEKIT_PUBLIC_URL: ws://localhost:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: devsecretdevsecretdevsecret32chr
+      CORS_ORIGIN: http://localhost:5173
+      NODE_ENV: test
+
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      - name: Aplicar migrations e seed
+        run: npm run db:deploy
+
+      - name: Verificar lint
+        run: npm run lint:check
+
+      - name: Executar testes unitários
+        run: npm test -- --runInBand
+
+      - name: Executar testes E2E
+        run: npm run test:e2e -- --runInBand
+
+      - name: Gerar build da API
+        run: npm run build
+
+  web:
+    name: Web — lint, testes, build e PWA
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Verificar lint
+        run: npm run lint
+
+      - name: Executar testes
+        run: npm test
+
+      - name: Gerar build e service worker
+        run: npm run build
+        env:
+          VITE_API_URL: /api
+
+      - name: Confirmar artefatos da PWA
+        run: test -f dist/manifest.webmanifest && test -f dist/sw.js
+
+  containers:
+    name: Docker — validar imagens
+    runs-on: ubuntu-latest
+    needs:
+      - api
+      - web
+    timeout-minutes: 25
+
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar variáveis locais
+        run: cp .env.example .env
+
+      - name: Validar Docker Compose
+        run: docker compose config --quiet
+
+      - name: Construir imagens da aplicação
+        run: docker compose build migrate api web

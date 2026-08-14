@@ -15,6 +15,7 @@ acessos e cria salas temporárias de vídeo e chat com LiveKit.
 - Auditoria de leituras permitidas e tentativas negadas.
 - Sala LiveKit com JWT curto, renovação e link opaco de uso único para paciente.
 - Interface React responsiva para desktop e dispositivos móveis.
+- PWA instalável com atualização controlada e cache restrito ao shell estático.
 
 ## Stack
 
@@ -188,6 +189,10 @@ Essas credenciais existem apenas no seed de desenvolvimento.
 
 ## Testes
 
+O workflow [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) executa em
+pull requests e pushes para `main` ou `feat/**`: lint, testes unitários, E2E com
+PostgreSQL isolado, builds da API e da PWA e construção das imagens Docker.
+
 ### Backend unitário
 
 ```powershell
@@ -222,6 +227,25 @@ npm run lint
 npm run build
 npm test
 ```
+
+### PWA e instalação
+
+O manifesto e o service worker são gerados apenas no build de produção. Para
+validar a instalação localmente:
+
+```powershell
+cd web
+npm run build
+npm run preview
+```
+
+Abra <http://localhost:4173> e use a opção **Instalar PAD BenCorp** oferecida
+pelo navegador. No ambiente Docker, a mesma validação pode ser feita em
+<http://localhost:8080>.
+
+O cache offline contém somente HTML, CSS, JavaScript, fontes e imagens do shell.
+Chamadas `/api`, autenticação, prontuários, pacientes e demais dados
+assistenciais permanecem `NetworkOnly` e exigem conexão com o servidor.
 
 ## Variáveis principais
 
@@ -260,7 +284,7 @@ Documentos relacionados:
 
 As decisões arquiteturais, alternativas rejeitadas e consequências estão em
 [docs/decisoes-tecnicas.md](./docs/decisoes-tecnicas.md). As limitações atuais,
-inclusive PWA, LiveKit self-hosted, cobertura frontend e requisitos para
+inclusive o escopo offline da PWA, LiveKit self-hosted, cobertura frontend e requisitos para
 produção, estão registradas em [docs/limitacoes.md](./docs/limitacoes.md).
 
 ## Uso de IA

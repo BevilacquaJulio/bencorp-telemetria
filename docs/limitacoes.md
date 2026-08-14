@@ -3,18 +3,21 @@
 As limitações abaixo são explícitas para que o ambiente de demonstração não
 seja confundido com uma implantação pronta para dados clínicos reais.
 
-## 1. PWA ainda não concluída
+## 1. PWA sem operação clínica offline
 
-O frontend possui a dependência `vite-plugin-pwa`, mas ainda não registra
-service worker, manifest e ícones instaláveis. Portanto, nesta versão a
-aplicação é responsiva, porém ainda não deve ser apresentada como PWA.
+O frontend é instalável, registra service worker, oferece atualização controlada
+e mantém o shell estático disponível sem conexão. A PWA não permite consultar ou
+alterar dados assistenciais offline.
 
-**Abordagem adotada:** priorizar primeiro autorização no backend, concorrência,
-imutabilidade e sala temporária, porque são os riscos centrais do case.
+**Abordagem adotada:** o precache contém apenas HTML, CSS, JavaScript, fontes e
+imagens versionadas. Requisições `/api` usam estratégia `NetworkOnly`; tokens,
+pacientes, prontuários e respostas autenticadas não são persistidos pelo service
+worker.
 
-**Próximo passo:** configurar manifest, ícones 192/512, atualização controlada do
-service worker e cache apenas do shell estático. Dados clínicos e respostas
-autenticadas não devem ser persistidos em cache offline.
+**Para uma evolução offline:** seria necessário definir regras de sincronização,
+expiração, criptografia local, resolução de conflitos, revogação remota e análise
+formal de risco/LGPD. Esse comportamento não deve ser introduzido apenas com um
+cache genérico.
 
 ## 2. LiveKit local não representa produção
 
@@ -55,14 +58,16 @@ chat, desconexão e tentativa de reconexão.
 
 ## 5. Cobertura automatizada do frontend é parcial
 
-O frontend possui testes de login, validação e erro, mas fila, histórico,
-administração e sala ainda dependem de testes E2E do backend e inspeção manual.
+O frontend cobre login, validação, autorização de rotas, estados da fila,
+busca, conflito `409`, navegação para a sala e convite de paciente inválido,
+expirado ou aceito. Histórico detalhado, administração e a mídia WebRTC real
+ainda dependem dos E2E do backend e de inspeção manual.
 
 **Abordagem adotada:** concentrar a maior cobertura automática nas regras do
 servidor, pois o frontend não deve ser a fronteira de segurança.
 
-**Próximo passo:** cobrir rotas protegidas, estados loading/error/empty, filtros,
-tratamento do `409`, link revogado e diferenças visuais por papel.
+**Próximo passo:** cobrir histórico, administração e diferenças visuais por
+papel, além de uma suíte de navegador separada para o LiveKit real.
 
 ## 6. Sessão do profissional no navegador
 
