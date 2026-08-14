@@ -1,6 +1,7 @@
 import { ShieldCheckIcon } from '@phosphor-icons/react'
 import { NavLink } from 'react-router-dom'
 import compactLogo from '../../assets/bencorp.png'
+import fullLogo from '../../assets/bencorp-full.png'
 import type { NavigationSection } from './navigation'
 
 type SidebarNavProps = {
@@ -26,11 +27,16 @@ export function SidebarNav({
   return (
     <>
       <div className="sidebar__brand">
-        <img src={compactLogo} alt="" />
-        <span className="sidebar__brand-text">
-          <strong>PAD</strong>
-          <span>BenCorp</span>
-        </span>
+        <img
+          className="sidebar__brand-mark sidebar__brand-mark--full"
+          src={fullLogo}
+          alt="BenCorp"
+        />
+        <img
+          className="sidebar__brand-mark sidebar__brand-mark--compact"
+          src={compactLogo}
+          alt="BenCorp"
+        />
       </div>
 
       <nav className="sidebar__nav" aria-label="Navegação principal">
