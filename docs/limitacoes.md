@@ -59,15 +59,16 @@ chat, desconexão e tentativa de reconexão.
 ## 5. Cobertura automatizada do frontend é parcial
 
 O frontend cobre login, validação, autorização de rotas, estados da fila,
-busca, conflito `409`, navegação para a sala e convite de paciente inválido,
-expirado ou aceito. Histórico detalhado, administração e a mídia WebRTC real
-ainda dependem dos E2E do backend e de inspeção manual.
+busca, conflito `409`, retomada de atendimento antigo, administração de perfis,
+convites, triagem e encaminhamento, prontuário e finalização. Histórico
+detalhado e a mídia WebRTC real ainda dependem dos E2E do backend e de inspeção
+manual.
 
 **Abordagem adotada:** concentrar a maior cobertura automática nas regras do
 servidor, pois o frontend não deve ser a fronteira de segurança.
 
-**Próximo passo:** cobrir histórico, administração e diferenças visuais por
-papel, além de uma suíte de navegador separada para o LiveKit real.
+**Próximo passo:** cobrir histórico e diferenças visuais por papel, além de uma
+suíte de navegador separada para o LiveKit real.
 
 ## 6. Sessão do profissional no navegador
 
@@ -127,3 +128,17 @@ demonstrar regras de negócio e concorrência.
 
 **Para produção:** réplicas stateless da API, PostgreSQL com backup/replicação,
 LiveKit dimensionado para banda e CPU e testes de carga com metas explícitas.
+
+## 11. Entrega do convite ao paciente é assistida
+
+A aplicação gera o link individual e oferece cópia e compartilhamento pelo
+recurso nativo do dispositivo. Não existe envio automático por SMS, WhatsApp ou
+e-mail neste recorte.
+
+**Abordagem adotada:** manter a emissão do segredo separada de provedores de
+mensageria, permitindo que o profissional escolha um canal de contato já
+autorizado pelo paciente.
+
+**Para produção:** integrar um provedor transacional, registrar consentimento e
+status de entrega, aplicar templates sem dados clínicos e definir retentativa e
+expiração do convite.

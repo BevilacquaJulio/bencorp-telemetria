@@ -209,3 +209,31 @@ dependências ou no código.
 **Trade-off:** construir as três imagens aumenta o tempo do workflow. O custo é
 aceito para a branch principal e pull requests porque a execução local via
 Docker é parte obrigatória da entrega.
+
+## 18. Permissões administrativas baseadas em papéis
+
+**Decisão:** a gestão de acesso permite criar, ativar, desativar e trocar o
+papel entre `ADMIN`, `ENFERMEIRO` e `MEDICO`. Cada papel recebe a matriz fixa de
+permissões definida pelo case.
+
+**Motivo:** o domínio apresentado possui três funções claras e não exige
+permissões personalizadas por pessoa. Expor caixas de seleção independentes
+poderia produzir combinações incoerentes, como prontuário sem acesso ao
+atendimento.
+
+**Trade-off:** a solução não oferece papéis customizados nem permissões
+granulares. Se a organização precisar de novas funções, a evolução adequada é
+modelar permissões nomeadas e políticas testáveis, preservando as regras de
+vínculo por recurso.
+
+## 19. Convite emitido pela plataforma e entrega assistida
+
+**Decisão:** o profissional gera o convite na sala e pode copiá-lo ou usar o
+compartilhamento nativo do dispositivo; a API não envia mensagens diretamente.
+
+**Motivo:** SMS, e-mail e WhatsApp exigem provedor, consentimento, templates,
+tratamento de falha e configuração externa que não fazem parte do recorte.
+
+**Trade-off:** há uma etapa manual antes de o paciente receber o link. A
+separação mantém o token de uso único e permite adicionar um canal transacional
+posteriormente sem alterar a autorização da sala.

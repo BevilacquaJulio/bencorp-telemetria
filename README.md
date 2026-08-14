@@ -204,7 +204,8 @@ npm run test:cov
 ### Backend E2E
 
 Os testes E2E escrevem dados. Use um banco exclusivo, nunca um banco real ou o
-banco manual de demonstração.
+banco manual de demonstração. Como proteção adicional, a suíte recusa a
+execução quando o nome do banco não começa com `pad_test`.
 
 ```powershell
 docker exec pad-db psql -U pad -d postgres -c "CREATE DATABASE pad_test;"
