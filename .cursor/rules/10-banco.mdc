@@ -4,12 +4,39 @@ globs: ["api/prisma/**", "api/src/**/*.repository.ts", "api/src/common/prisma/**
 alwaysApply: false
 ---
 
-# Banco de dados — PostgreSQL + Prisma
+# Banco de dados — PostgreSQL 16 + Prisma 7
+
+## Prisma 7 — cinco diferenças que quebram o código se ignoradas
+
+O projeto usa **Prisma 7.9**. Não vale conhecimento de Prisma 5/6 aqui.
+
+1. **Adapter de driver é obrigatório.** `new PrismaClient()` sem adapter lança erro no boot. Para PostgreSQL use `@prisma/adapter-pg`:
+
+   ```ts
+   import { PrismaPg } from '@prisma/adapter-pg';
+   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+   super({ adapter });
+   ```
+
+2. **O client é importado da pasta gerada**, nunca de `@prisma/client`:
+
+   ```ts
+   import { PrismaClient, Papel, StatusAtendimento } from '../../generated/prisma/client';
+   ```
+
+   Por padrão esse client gerado é **ESM puro** (usa `import.meta.url` internamente). O resto do projeto — Nest, ts-node, Jest — é CommonJS, e `require()` não carrega um arquivo assim: quebra em runtime com `ReferenceError: exports is not defined in ES module scope`, não em build (confirmado rodando `ts-node` contra o client gerado sem essa flag). Por isso o `generator client` em `schema.prisma` tem `moduleFormat = "cjs"`. Se essa linha sumir numa regeneração, o erro volta — a causa não é o import, é o generator emitindo o formato errado pra este projeto.
+
+3. **A URL do banco mora em `prisma.config.ts`**, não no bloco `datasource` do schema. O `datasource` só declara o provider.
+
+4. **`generated/` fica fora de `node_modules`** e é ignorado pelo Git. `prisma generate` precisa rodar no build do Docker.
+
+5. **Jest precisa de `--experimental-vm-modules`.** No `$connect()`, o Prisma 7 faz `import()` dinâmico do compilador WASM (`query_compiler_fast_bg.postgresql.js`). O Jest intercepta esse `import()` e, sem a flag, derruba o `app.init()` com `A dynamic import callback was invoked without --experimental-vm-modules` — todos os e2e falham no boot, antes de qualquer asserção. Os scripts `test` / `test:e2e` já passam a flag via `node --experimental-vm-modules ./node_modules/jest/bin/jest.js`. Sem isso, `npx jest` sozinho volta a quebrar.
 
 ## Não negociável
 
-- `provider = "postgresql"`. Nunca MySQL, nunca SQLite (nem em teste — a semântica de lock que estamos testando é do Postgres).
+- `provider = "postgresql"`. Nunca MySQL, nunca SQLite (nem em teste — a semântica de bloqueio que estamos testando é do Postgres).
 - Migrations **versionadas e commitadas**. Nunca `prisma db push`.
+- Prisma é dono do schema: edite `schema.prisma` e gere a migration. Só desça para SQL cru no que o Prisma não expressa (índice parcial, gatilho), via `migrate dev --create-only`.
 - Chave primária `String @id @default(uuid()) @db.Uuid`. IDs não enumeráveis reduzem superfície de acesso indevido por troca de ID na URL.
 - Nomes de campo em português (`criadoEm`, `entradaFila`, `finalizadoEm`).
 
@@ -99,4 +126,6 @@ A auditoria fica **fora** da transação de negócio, deliberadamente: um rollba
 
 `prisma/seed.ts` cria: 1 ADMIN, 2 ENFERMEIRO, 2 MEDICO, ~10 pacientes, ~15 atendimentos distribuídos entre os quatro status e entre hoje / ontem / semana passada — os filtros da fila precisam ter o que filtrar. Senhas em texto no README, hash no banco.
 
-Roda automaticamente no boot do container da API.
+Roda automaticamente no boot do container da API — por isso todo `create` é na verdade um `upsert` com `update: {}` e id fixo (Atendimento não tem chave de negócio única pra upsertar). Reiniciar o container não pode duplicar dado nem apagar o que um teste manual já alterou.
+
+Runner configurado em `prisma.config.ts` (`migrations.seed`): `tsx`, não `ts-node`. Tentativa inicial foi `ts-node` pra não introduzir ferramenta nova — quebrou com `Cannot find module './internal/class.js'`: o client gerado importa seus arquivos internos com `.js` apontando pra fonte `.ts` (convenção do `moduleResolution: "nodenext"`), e o `require()` do ts-node não remapeia isso. Só quebra em scripts soltos — o build real do Nest (`tsc`, ver `nest-cli.json`) resolve isso na compilação, então o app em si nunca passa por esse caminho. Confirmado rodando o seed de ponta a ponta (chegou a tentar conectar no banco, só faltou o Postgres estar de pé).
