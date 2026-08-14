@@ -20,6 +20,7 @@ export type QueueScope =
   | 'aguardando'
   | 'em-andamento'
   | 'finalizados'
+  | 'cancelados'
   | 'prioridade'
 
 export const HIGH_PRIORITY_RISKS: Risco[] = ['VERMELHO', 'LARANJA']
@@ -36,6 +37,8 @@ export function scopeToFilters(
       return { status: ['EM_ANDAMENTO'] }
     case 'finalizados':
       return { status: ['FINALIZADO'] }
+    case 'cancelados':
+      return { status: ['CANCELADO'] }
     case 'prioridade':
       return { status: OPEN_STATUSES, risco: HIGH_PRIORITY_RISKS }
     default:
@@ -55,6 +58,7 @@ export const scopeLabels: Record<QueueScope, string> = {
   aguardando: 'Aguardando',
   'em-andamento': 'Em atendimento',
   finalizados: 'Finalizados',
+  cancelados: 'Cancelados',
   prioridade: 'Alta prioridade em aberto',
 }
 
