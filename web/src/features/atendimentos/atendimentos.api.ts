@@ -3,6 +3,7 @@ import type {
   AttendanceDetail,
   QueueFilters,
   QueueResponse,
+  RegisterPatientInput,
   TriageInput,
 } from './atendimentos.types'
 
@@ -11,6 +12,14 @@ export async function listQueue(filters: QueueFilters) {
     Object.entries(filters).filter(([, value]) => value !== undefined),
   )
   const { data } = await api.get<QueueResponse>('/atendimentos', { params })
+  return data
+}
+
+export async function registerPatient(input: RegisterPatientInput) {
+  const { data } = await api.post<AttendanceDetail>(
+    '/atendimentos/cadastrar-paciente',
+    input,
+  )
   return data
 }
 

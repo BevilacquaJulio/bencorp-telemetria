@@ -1,5 +1,42 @@
 import { z } from 'zod'
-import type { TriageInput } from './atendimentos.types'
+import type { RegisterPatientInput, TriageInput } from './atendimentos.types'
+
+export const patientIntakeFormSchema = z.object({
+  nome: z.string().trim().min(3, 'Informe o nome completo').max(120),
+  cpf: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value.replace(/\D/g, '').length === 11,
+      'CPF deve conter 11 dígitos',
+    ),
+  contato: z.string().trim().min(8, 'Informe um contato válido').max(40),
+  nascimento: z
+    .string()
+    .min(1, 'Informe a data de nascimento')
+    .refine(
+      (value) => !Number.isNaN(Date.parse(`${value}T00:00:00`)),
+      'Data de nascimento inválida',
+    )
+    .refine((value) => value >= '1900-01-01', 'Data de nascimento inválida')
+    .refine(
+      (value) => new Date(`${value}T00:00:00`) <= new Date(),
+      'Data de nascimento não pode estar no futuro',
+    ),
+})
+
+export type PatientIntakeFormValues = z.infer<typeof patientIntakeFormSchema>
+
+export function toRegisterPatientInput(
+  values: PatientIntakeFormValues,
+): RegisterPatientInput {
+  return {
+    nome: values.nome.trim(),
+    cpf: values.cpf.replace(/\D/g, ''),
+    contato: values.contato.trim(),
+    nascimento: values.nascimento,
+  }
+}
 
 const optionalNumber = (label: string, minimum: number, maximum: number) =>
   z

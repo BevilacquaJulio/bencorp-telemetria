@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --brand-blue: #174b73;
@@ -28,7 +28,7 @@
   --radius-control: 12px;
   --radius-button: 10px;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  font-family: Aptos, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif;
+  font-family: Aptos, 'Segoe UI Variable', 'Segoe UI', Roboto, sans-serif;
   color: var(--ink);
   background: var(--canvas);
   font-synthesis: none;
@@ -301,7 +301,7 @@ img {
   bottom: 0;
   width: 44%;
   height: 5px;
-  content: "";
+  content: '';
   background: var(--brand-teal);
 }
 
@@ -324,7 +324,8 @@ img {
   max-width: 12ch;
   margin: 0;
   color: #f5ffff;
-  font-family: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font-family:
+    'Aptos Display', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
   font-size: clamp(2.5rem, 4.4vw, 4.8rem);
   font-weight: 650;
   letter-spacing: -0.045em;
@@ -389,7 +390,12 @@ img {
     var(--brand-teal) 0 48deg,
     transparent 48deg 60deg
   );
-  mask: radial-gradient(circle, transparent 0 42%, #000 43% 66%, transparent 67%);
+  mask: radial-gradient(
+    circle,
+    transparent 0 42%,
+    #000 43% 66%,
+    transparent 67%
+  );
   opacity: 0.9;
 }
 
@@ -411,7 +417,9 @@ img {
   background:
     linear-gradient(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.98)),
     linear-gradient(90deg, rgb(23 75 115 / 0.04) 1px, transparent 1px);
-  background-size: auto, 48px 48px;
+  background-size:
+    auto,
+    48px 48px;
   place-items: center;
 }
 
@@ -437,7 +445,8 @@ img {
 .login-card__heading h2 {
   margin: 0;
   color: var(--ink);
-  font-family: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font-family:
+    'Aptos Display', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
   font-size: clamp(2rem, 3vw, 2.55rem);
   font-weight: 700;
   letter-spacing: -0.035em;
@@ -632,7 +641,7 @@ img {
   width: 3px;
   height: 0;
   border-radius: 4px 0 0 4px;
-  content: "";
+  content: '';
   background: var(--brand-teal);
   transform: translateY(-50%);
   transition: height 180ms var(--ease-out);
@@ -880,7 +889,8 @@ img {
 .page-heading h1 {
   margin: 0;
   color: var(--ink);
-  font-family: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font-family:
+    'Aptos Display', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
   font-size: clamp(1.9rem, 3vw, 2.65rem);
   font-weight: 720;
   letter-spacing: -0.04em;
@@ -1341,6 +1351,18 @@ tbody tr:last-child td {
   color: var(--brand-teal-700);
 }
 
+.queue-contact,
+.queue-entry-date {
+  display: inline-block;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.queue-entry-date {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 .panel-pagination {
   display: flex;
   gap: 1rem;
@@ -1772,8 +1794,8 @@ tbody tr:last-child td {
 
 .care-entry {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 0.8rem;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 0.75rem;
 }
 
 .care-entry__rail {
@@ -1784,11 +1806,11 @@ tbody tr:last-child td {
 
 .care-entry__rail::after {
   position: absolute;
-  top: 26px;
+  top: 29px;
   bottom: -1px;
   width: 1px;
-  content: "";
-  background: #cbdfe2;
+  content: '';
+  background: var(--border-strong);
 }
 
 .care-entry:last-child .care-entry__rail::after {
@@ -1798,67 +1820,185 @@ tbody tr:last-child td {
 .care-entry__rail > span {
   position: relative;
   z-index: 1;
-  width: 13px;
-  height: 13px;
-  margin-top: 23px;
+  width: 12px;
+  height: 12px;
+  margin-top: 25px;
   border: 3px solid var(--canvas);
   border-radius: 50%;
-  background: var(--brand-teal);
-  box-shadow: 0 0 0 1px var(--brand-teal-700);
+  background: var(--brand-teal-700);
+  box-shadow: 0 0 0 1px #8fc6c7;
 }
 
 .care-entry__content {
   display: grid;
-  gap: 1rem;
   margin-bottom: 1rem;
-  padding: 1.25rem;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
+  box-shadow: 0 8px 26px rgb(13 58 85 / 0.045);
 }
 
-.care-entry__content > header {
+.attendance-stage {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1.3rem 1.35rem;
+  border-left: 3px solid var(--brand-teal-700);
+}
+
+.attendance-stage--pending {
+  border-left-color: var(--warning);
+}
+
+.attendance-stage--completed {
+  border-left-color: var(--success);
+}
+
+.attendance-stage--canceled {
+  border-left-color: var(--danger);
+}
+
+.attendance-stage__icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  color: var(--brand-blue);
+  border-radius: 12px;
+  background: #edf5f7;
+  place-items: center;
+}
+
+.attendance-stage--pending .attendance-stage__icon {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.attendance-stage--triaged .attendance-stage__icon {
+  color: var(--brand-teal-700);
+  background: var(--brand-teal-soft);
+}
+
+.attendance-stage--completed .attendance-stage__icon {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.attendance-stage--canceled .attendance-stage__icon {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.attendance-stage__body {
+  min-width: 0;
+}
+
+.attendance-stage__heading {
   display: flex;
   gap: 1rem;
   align-items: flex-start;
   justify-content: space-between;
 }
 
-.care-entry__content header p {
-  margin: 0 0 0.25rem;
+.attendance-stage__heading > div > span {
+  display: block;
+  margin-bottom: 0.18rem;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
+  font-weight: 700;
 }
 
-.care-entry__content header h3 {
+.attendance-stage__heading h3 {
   margin: 0;
   color: var(--ink);
-  font-size: 0.9rem;
+  font-size: 1rem;
+  letter-spacing: -0.015em;
 }
 
-.care-entry__badges {
+.attendance-stage__heading time {
   display: flex;
-  gap: 0.45rem;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  padding-top: 0.12rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  align-items: center;
+}
+
+.attendance-stage__body > p {
+  max-width: 70ch;
+  margin: 0.5rem 0 0;
+  color: var(--text);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.attendance-stage__metadata {
+  display: flex;
+  gap: 0;
+  margin: 0.95rem 0 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
   flex-wrap: wrap;
-  justify-content: flex-end;
+}
+
+.attendance-stage__metadata > div {
+  display: grid;
+  min-width: 150px;
+  gap: 0.16rem;
+  padding: 0 1rem;
+}
+
+.attendance-stage__metadata > div:first-child {
+  padding-left: 0;
+}
+
+.attendance-stage__metadata > div + div {
+  border-left: 1px solid var(--border);
+}
+
+.attendance-stage__metadata dt {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.attendance-stage__metadata dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 750;
 }
 
 .clinical-summary {
-  padding: 1rem;
-  border-radius: 13px;
+  padding: 1.1rem 1.35rem 1.25rem;
+  border-top: 1px solid var(--border);
   background: var(--surface-muted);
+}
+
+.clinical-summary__heading {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
 .clinical-summary__title {
   display: flex;
-  gap: 0.55rem;
+  min-width: 0;
+  gap: 0.65rem;
   color: var(--brand-teal-700);
-  align-items: center;
+  align-items: flex-start;
+}
+
+.clinical-summary__title > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
 }
 
 .clinical-summary__title strong {
   color: var(--ink);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
 
 .clinical-summary__title span {
@@ -1867,6 +2007,18 @@ tbody tr:last-child td {
   font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.clinical-summary__meta {
+  display: flex;
+  gap: 0.65rem;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.clinical-summary__meta time {
+  color: var(--muted);
+  font-size: 0.68rem;
 }
 
 .clinical-summary dl {
@@ -1878,9 +2030,7 @@ tbody tr:last-child td {
 
 .clinical-summary dl > div {
   padding: 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--surface);
+  border-left: 1px solid var(--border-strong);
 }
 
 .clinical-summary dt {
@@ -1897,6 +2047,7 @@ tbody tr:last-child td {
 
 .medical-record {
   overflow: hidden;
+  margin: 1.25rem 1.35rem;
   border: 1px solid #cfe2e5;
   border-radius: 14px;
 }
@@ -1968,9 +2119,37 @@ tbody tr:last-child td {
   display: flex;
   gap: 0.45rem;
   margin: 0;
+  padding: 0 1.35rem 1.25rem;
   color: var(--muted);
   font-size: 0.72rem;
   align-items: center;
+}
+
+.registration-success {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.95rem 1.05rem;
+  color: var(--success);
+  border: 1px solid rgb(35 118 95 / 0.2);
+  border-radius: var(--radius-control);
+  background: var(--success-soft);
+  align-items: flex-start;
+}
+
+.registration-success > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.registration-success strong {
+  color: var(--success);
+  font-size: 0.78rem;
+}
+
+.registration-success span {
+  color: var(--text);
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
 
 /* Administration */
@@ -2017,7 +2196,8 @@ tbody tr:last-child td {
   font-size: 1.45rem;
 }
 
-.user-create-panel {
+.user-create-panel,
+.patient-intake-panel {
   overflow: hidden;
   border: 1px solid #cfe2e5;
   border-radius: var(--radius-card);
@@ -2025,7 +2205,8 @@ tbody tr:last-child td {
   box-shadow: var(--shadow-sm);
 }
 
-.user-create-panel > header {
+.user-create-panel > header,
+.patient-intake-panel > header {
   display: flex;
   gap: 1rem;
   padding: 1.25rem 1.4rem;
@@ -2039,11 +2220,15 @@ tbody tr:last-child td {
 
 .user-create-panel header p,
 .user-create-panel header h2,
-.user-create-panel header span {
+.user-create-panel header span,
+.patient-intake-panel header p,
+.patient-intake-panel header h2,
+.patient-intake-panel header span {
   margin: 0;
 }
 
-.user-create-panel header p {
+.user-create-panel header p,
+.patient-intake-panel header p {
   margin-bottom: 0.25rem;
   color: var(--brand-teal-700);
   font-size: 0.65rem;
@@ -2052,19 +2237,22 @@ tbody tr:last-child td {
   text-transform: uppercase;
 }
 
-.user-create-panel header h2 {
+.user-create-panel header h2,
+.patient-intake-panel header h2 {
   color: var(--ink);
   font-size: 1.15rem;
 }
 
-.user-create-panel header span {
+.user-create-panel header span,
+.patient-intake-panel header span {
   display: block;
   margin-top: 0.35rem;
   color: var(--muted);
   font-size: 0.75rem;
 }
 
-.user-create-panel > header > button {
+.user-create-panel > header > button,
+.patient-intake-panel > header > button {
   display: grid;
   width: 36px;
   height: 36px;
@@ -2074,10 +2262,13 @@ tbody tr:last-child td {
   background: transparent;
   cursor: pointer;
   place-items: center;
-  transition: color 160ms ease, background-color 160ms ease;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
 }
 
-.user-create-form {
+.user-create-form,
+.patient-intake-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
@@ -2085,11 +2276,14 @@ tbody tr:last-child td {
 }
 
 .user-create-form__actions,
-.user-create-form .form-alert {
+.user-create-form .form-alert,
+.patient-intake-form__actions,
+.patient-intake-form .form-alert {
   grid-column: 1 / -1;
 }
 
-.user-create-form__actions {
+.user-create-form__actions,
+.patient-intake-form__actions {
   display: flex;
   gap: 0.65rem;
   justify-content: flex-end;
@@ -2119,7 +2313,9 @@ tbody tr:last-child td {
   border-radius: var(--radius-control);
   outline: 0;
   background: var(--surface);
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .select-field select,
@@ -3127,13 +3323,16 @@ tbody tr:last-child td {
     margin-top: 0.8rem;
   }
 
-  .user-create-form {
+  .user-create-form,
+  .patient-intake-form {
     grid-template-columns: 1fr;
     padding: 1rem;
   }
 
   .user-create-form__actions,
-  .user-create-form .form-alert {
+  .user-create-form .form-alert,
+  .patient-intake-form__actions,
+  .patient-intake-form .form-alert {
     grid-column: auto;
   }
 
@@ -3198,6 +3397,32 @@ tbody tr:last-child td {
     background: var(--surface-muted);
     align-items: center;
     justify-content: space-between;
+  }
+
+  .attendance-card__facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+  }
+
+  .attendance-card__facts div {
+    min-width: 0;
+  }
+
+  .attendance-card__facts dt {
+    color: var(--muted);
+    font-size: 0.64rem;
+  }
+
+  .attendance-card__facts dd {
+    margin: 0.2rem 0 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .attendance-card > .button,
@@ -3265,25 +3490,56 @@ tbody tr:last-child td {
   }
 
   .care-entry__content {
+    border-radius: 15px;
+  }
+
+  .attendance-stage {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 0.75rem;
     padding: 1rem;
   }
 
-  .care-entry__content > header {
+  .attendance-stage__icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .attendance-stage__heading {
+    gap: 0.55rem;
     flex-direction: column;
   }
 
-  .care-entry__badges {
-    justify-content: flex-start;
+  .attendance-stage__metadata > div {
+    min-width: 100%;
+    padding: 0.6rem 0 0;
   }
 
-  .clinical-summary__title {
-    align-items: flex-start;
-    flex-wrap: wrap;
+  .attendance-stage__metadata > div:first-child {
+    padding-top: 0;
+  }
+
+  .attendance-stage__metadata > div + div {
+    margin-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+
+  .clinical-summary {
+    padding: 1rem;
+  }
+
+  .clinical-summary__heading {
+    gap: 0.75rem;
+    flex-direction: column;
   }
 
   .clinical-summary__title span {
-    width: 100%;
     white-space: normal;
+  }
+
+  .clinical-summary__meta {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .clinical-summary dl {
@@ -3363,11 +3619,16 @@ tbody tr:last-child td {
     flex-direction: column;
   }
 
+  .attendance-card__facts {
+    grid-template-columns: 1fr;
+  }
+
   .clinical-summary dl {
     grid-template-columns: 1fr;
   }
 
   .user-create-form__actions,
+  .patient-intake-form__actions,
   .clinical-end-actions,
   .patient-invite-card__actions,
   .conference-disconnected__actions {
@@ -3376,6 +3637,7 @@ tbody tr:last-child td {
   }
 
   .user-create-form__actions .button,
+  .patient-intake-form__actions .button,
   .clinical-end-actions .button,
   .patient-invite-card__actions .button {
     width: 100%;

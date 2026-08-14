@@ -1,10 +1,12 @@
 import {
   ArrowRightIcon,
+  CheckCircleIcon,
   ClockIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
   PlayIcon,
   StethoscopeIcon,
+  UserPlusIcon,
   UsersThreeIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
@@ -19,9 +21,10 @@ import {
 } from '../../../components/ui/DataState'
 import { RiskBadge, StatusBadge } from '../../../components/ui/StatusBadge'
 import { getApiErrorMessage } from '../../../lib/api'
-import { formatCpf, timeInQueue } from '../../../lib/format'
+import { formatCpf, formatDateTime, timeInQueue } from '../../../lib/format'
 import { useAuth } from '../../auth/auth-context'
 import { listQueue, startAttendance } from '../atendimentos.api'
+import { PatientIntakePanel } from '../components/PatientIntakePanel'
 import type {
   AttendanceListItem,
   QueueFilters,
@@ -45,6 +48,8 @@ export function QueuePage() {
   const [status, setStatus] = useState<StatusAtendimento | ''>('')
   const [period, setPeriod] = useState<QueueFilters['periodo']>('hoje')
   const [page, setPage] = useState(1)
+  const [registeringPatient, setRegisteringPatient] = useState(false)
+  const [registeredPatientName, setRegisteredPatientName] = useState('')
 
   const filters: QueueFilters = {
     busca: deferredSearch.trim() || undefined,
@@ -88,9 +93,9 @@ export function QueuePage() {
   }
 
   function actionLabel(statusValue: StatusAtendimento) {
-    if (statusValue === 'AGUARDANDO') return 'Atender'
-    if (statusValue === 'EM_ANDAMENTO') return 'Continuar'
-    return 'Ver histórico'
+    if (statusValue === 'AGUARDANDO') return 'Iniciar atendimento'
+    if (statusValue === 'EM_ANDAMENTO') return 'Ver atendimento'
+    return 'Ver detalhes'
   }
 
   return (
@@ -101,11 +106,51 @@ export function QueuePage() {
           <h1>Fila de atendimentos</h1>
           <p>Acompanhe a demanda e conduza cada paciente com segurança.</p>
         </div>
-        <div className="page-heading__date">
-          <ClockIcon size={18} />
-          Atualização em tempo real
+        <div className="page-heading__actions">
+          <div className="page-heading__date">
+            <ClockIcon size={18} />
+            Atualização em tempo real
+          </div>
+          {user?.papel === 'ENFERMEIRO' ? (
+            <Button
+              type="button"
+              icon={<UserPlusIcon size={18} weight="bold" />}
+              onClick={() => {
+                setRegisteredPatientName('')
+                setRegisteringPatient(true)
+              }}
+            >
+              Cadastrar paciente
+            </Button>
+          ) : null}
         </div>
       </header>
+
+      {registeringPatient ? (
+        <PatientIntakePanel
+          onClose={() => setRegisteringPatient(false)}
+          onCreated={(attendance) => {
+            setRegisteringPatient(false)
+            setRegisteredPatientName(attendance.paciente.nome)
+            setStatus('')
+            setPeriod('hoje')
+            setPage(1)
+          }}
+        />
+      ) : null}
+
+      {registeredPatientName ? (
+        <section className="registration-success" role="status">
+          <CheckCircleIcon size={22} weight="fill" aria-hidden="true" />
+          <div>
+            <strong>Paciente cadastrado</strong>
+            <span>
+              Cadastro de {registeredPatientName} concluído. A pessoa foi
+              incluída na fila e aguarda o início do atendimento.
+            </span>
+          </div>
+        </section>
+      ) : null}
 
       <section className="metrics-grid" aria-label="Resumo da fila">
         <article className="metric metric--primary page-enter page-enter--1">
@@ -156,7 +201,7 @@ export function QueuePage() {
               navigate(`/atendimentos/${activeAttendance.id}/sala`)
             }
           >
-            Continuar atendimento
+            Ver atendimento
           </Button>
         </section>
       ) : null}
@@ -242,9 +287,11 @@ export function QueuePage() {
                 <thead>
                   <tr>
                     <th>Paciente</th>
-                    <th>Classificação</th>
-                    <th>Tempo de fila</th>
+                    <th>Contato</th>
+                    <th>Classificação de risco</th>
                     <th>Status</th>
+                    <th>Entrada na fila</th>
+                    <th>Tempo de espera</th>
                     <th aria-label="Ações" />
                   </tr>
                 </thead>
@@ -261,16 +308,26 @@ export function QueuePage() {
                         </div>
                       </td>
                       <td>
+                        <span className="queue-contact">
+                          {item.paciente.contato}
+                        </span>
+                      </td>
+                      <td>
                         <RiskBadge risk={item.risco} />
+                      </td>
+                      <td>
+                        <StatusBadge status={item.status} />
+                      </td>
+                      <td>
+                        <span className="queue-entry-date">
+                          {formatDateTime(item.entradaFila)}
+                        </span>
                       </td>
                       <td>
                         <span className="queue-time">
                           <ClockIcon size={16} />
                           {timeInQueue(item.entradaFila)}
                         </span>
-                      </td>
-                      <td>
-                        <StatusBadge status={item.status} />
                       </td>
                       <td>
                         <Button
@@ -314,6 +371,16 @@ export function QueuePage() {
                     </div>
                     <StatusBadge status={item.status} />
                   </div>
+                  <dl className="attendance-card__facts">
+                    <div>
+                      <dt>Contato</dt>
+                      <dd>{item.paciente.contato}</dd>
+                    </div>
+                    <div>
+                      <dt>Entrada na fila</dt>
+                      <dd>{formatDateTime(item.entradaFila)}</dd>
+                    </div>
+                  </dl>
                   <div className="attendance-card__meta">
                     <RiskBadge risk={item.risco} />
                     <span className="queue-time">

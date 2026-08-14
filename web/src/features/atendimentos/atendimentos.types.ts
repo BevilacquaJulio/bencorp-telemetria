@@ -77,3 +77,10 @@ export type TriageInput = {
   temperatura?: number
   satO2?: number
 }
+
+export type RegisterPatientInput = {
+  nome: string
+  cpf: string
+  contato: string
+  nascimento: string
+}

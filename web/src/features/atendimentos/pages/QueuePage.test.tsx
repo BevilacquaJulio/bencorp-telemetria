@@ -1,12 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiErrorBody } from '../../../lib/api'
 import { AuthContext, type AuthContextValue } from '../../auth/auth-context'
-import { listQueue, startAttendance } from '../atendimentos.api'
+import {
+  listQueue,
+  registerPatient,
+  startAttendance,
+} from '../atendimentos.api'
 import type {
   AttendanceDetail,
   AttendanceListItem,
@@ -16,10 +20,12 @@ import { QueuePage } from './QueuePage'
 
 vi.mock('../atendimentos.api', () => ({
   listQueue: vi.fn(),
+  registerPatient: vi.fn(),
   startAttendance: vi.fn(),
 }))
 
 const mockedListQueue = vi.mocked(listQueue)
+const mockedRegisterPatient = vi.mocked(registerPatient)
 const mockedStartAttendance = vi.mocked(startAttendance)
 
 const waitingAttendance: AttendanceListItem = {
@@ -55,10 +61,10 @@ function renderQueue() {
   })
   const auth: AuthContextValue = {
     user: {
-      id: 'medico-1',
-      nome: 'Carla Nogueira',
-      email: 'carla.nogueira@pad.local',
-      papel: 'MEDICO',
+      id: 'enfermeiro-1',
+      nome: 'Ana Ferreira',
+      email: 'ana.ferreira@pad.local',
+      papel: 'ENFERMEIRO',
     },
     token: 'token-teste',
     signIn: vi.fn(),
@@ -107,6 +113,7 @@ function conflictError() {
 describe('QueuePage', () => {
   beforeEach(() => {
     mockedListQueue.mockReset()
+    mockedRegisterPatient.mockReset()
     mockedStartAttendance.mockReset()
   })
 
@@ -119,11 +126,70 @@ describe('QueuePage', () => {
     ).toBeInTheDocument()
   })
 
+  it('abre o cadastro da pessoa que seguirá para a triagem', async () => {
+    const user = userEvent.setup()
+    mockedListQueue.mockResolvedValue(queueResponse([]))
+    renderQueue()
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Cadastrar paciente' }),
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Cadastrar paciente' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Abrir atendimento' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('mantém a pessoa na fila depois do cadastro', async () => {
+    const user = userEvent.setup()
+    const registeredAttendance: AttendanceDetail = {
+      ...waitingAttendance,
+      finalizadoEm: null,
+      canceladoEm: null,
+      triagem: null,
+      encaminhadoDe: null,
+    }
+    mockedListQueue.mockResolvedValue(queueResponse([]))
+    mockedRegisterPatient.mockResolvedValue(registeredAttendance)
+    renderQueue()
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Cadastrar paciente' }),
+    )
+    const panel = screen.getByRole('region', { name: 'Cadastrar paciente' })
+    await user.type(
+      within(panel).getByLabelText('Nome completo'),
+      'Maria da Silva',
+    )
+    await user.type(within(panel).getByLabelText('CPF'), '123.456.789-01')
+    await user.type(within(panel).getByLabelText('Contato'), '(11) 99999-9999')
+    await user.type(
+      within(panel).getByLabelText('Data de nascimento'),
+      '1990-01-15',
+    )
+    await user.click(
+      within(panel).getByRole('button', { name: 'Cadastrar paciente' }),
+    )
+
+    await screen.findByText('Paciente cadastrado')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Cadastro de Maria da Silva concluído',
+    )
+    expect(
+      screen.queryByText('Sala profissional carregada'),
+    ).not.toBeInTheDocument()
+  })
+
   it('mostra uma falha de carregamento e permite tentar novamente', async () => {
     mockedListQueue.mockRejectedValue(new Error('indisponível'))
     renderQueue()
 
-    expect(await screen.findByText('Não foi possível carregar')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Não foi possível carregar'),
+    ).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Tentar novamente' }),
     ).toBeInTheDocument()
@@ -148,7 +214,9 @@ describe('QueuePage', () => {
     mockedStartAttendance.mockRejectedValue(conflictError())
     renderQueue()
 
-    const attendButtons = await screen.findAllByRole('button', { name: 'Atender' })
+    const attendButtons = await screen.findAllByRole('button', {
+      name: 'Iniciar atendimento',
+    })
     await user.click(attendButtons[0])
 
     expect(mockedStartAttendance).toHaveBeenCalledWith(
@@ -177,10 +245,14 @@ describe('QueuePage', () => {
     mockedStartAttendance.mockResolvedValue(attendance)
     renderQueue()
 
-    const attendButtons = await screen.findAllByRole('button', { name: 'Atender' })
+    const attendButtons = await screen.findAllByRole('button', {
+      name: 'Iniciar atendimento',
+    })
     await user.click(attendButtons[0])
 
-    expect(await screen.findByText('Sala profissional carregada')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Sala profissional carregada'),
+    ).toBeInTheDocument()
   })
 
   it('destaca o atendimento ativo mesmo fora do período da fila', async () => {
@@ -198,12 +270,37 @@ describe('QueuePage', () => {
     })
     renderQueue()
 
-    expect(await screen.findByText('Atendimento em andamento')).toBeInTheDocument()
-    await user.click(
-      screen.getByRole('button', { name: 'Continuar atendimento' }),
-    )
+    expect(
+      await screen.findByText('Atendimento em andamento'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Cadastrar paciente' }),
+    ).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Ver atendimento' }))
 
-    expect(await screen.findByText('Sala profissional carregada')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Sala profissional carregada'),
+    ).toBeInTheDocument()
     expect(mockedStartAttendance).not.toHaveBeenCalled()
+  })
+
+  it('exibe todas as colunas obrigatórias da fila de pronto atendimento', async () => {
+    mockedListQueue.mockResolvedValue(queueResponse([waitingAttendance]))
+    renderQueue()
+
+    await screen.findAllByText('Maria da Silva')
+    for (const column of [
+      'Paciente',
+      'Contato',
+      'Classificação de risco',
+      'Status',
+      'Entrada na fila',
+      'Tempo de espera',
+    ]) {
+      expect(
+        screen.getByRole('columnheader', { name: column }),
+      ).toBeInTheDocument()
+    }
+    expect(screen.getAllByText('(11) 99999-9999').length).toBeGreaterThan(0)
   })
 })
