@@ -19,4 +19,4 @@ export interface PayloadJwt {
  * Tipos de recurso que o EscopoGuard sabe verificar. Cresce junto com as
  * rotas: prontuário e sala entram nos blocos seguintes.
  */
-export type TipoDeRecurso = 'atendimento';
+export type TipoDeRecurso = 'atendimento' | 'prontuario' | 'paciente';
