@@ -1,60 +1,92 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { UserPlusIcon, WarningCircleIcon, XIcon } from '@phosphor-icons/react'
+import { CheckIcon, ProhibitIcon, UserPlusIcon } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import type { z } from 'zod'
+import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
 import { FormField } from '../../../components/ui/FormField'
+import { Modal } from '../../../components/ui/Modal'
+import { Select } from '../../../components/ui/Select'
+import { useToast } from '../../../components/ui/toast-context'
 import { getApiErrorMessage } from '../../../lib/api'
+import { roleOptions, rolePermissions } from '../role-options'
 import { createUser } from '../usuarios.api'
 import { createUserSchema } from '../usuarios.schema'
 
 type CreateUserForm = z.infer<typeof createUserSchema>
 
 type UserCreatePanelProps = {
+  open: boolean
   onClose: () => void
 }
 
-export function UserCreatePanel({ onClose }: UserCreatePanelProps) {
+export function UserCreatePanel({ open, onClose }: UserCreatePanelProps) {
   const queryClient = useQueryClient()
+  const { notify } = useToast()
+
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<CreateUserForm>({
     resolver: zodResolver(createUserSchema),
-    defaultValues: {
-      nome: '',
-      email: '',
-      senha: '',
-      papel: 'ENFERMEIRO',
-    },
+    defaultValues: { nome: '', email: '', senha: '', papel: 'ENFERMEIRO' },
   })
+
+  // `useWatch` em vez de `watch`: só este trecho re-renderiza quando o papel
+  // muda, em vez do formulário inteiro a cada tecla digitada.
+  const selectedRole = useWatch({ control, name: 'papel' })
+
   const mutation = useMutation({
     mutationFn: createUser,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['users'] })
       reset()
       onClose()
+      notify({
+        tone: 'success',
+        title: 'Usuário cadastrado',
+        description: `${variables.nome} já pode acessar o PAD.`,
+      })
     },
   })
 
   return (
-    <section className="user-create-panel" aria-labelledby="new-user-title">
-      <header>
-        <div>
-          <p>Controle de acesso</p>
-          <h2 id="new-user-title">Cadastrar profissional</h2>
-          <span>O perfil define as permissões funcionais dentro do PAD.</span>
-        </div>
-        <button type="button" aria-label="Fechar cadastro" onClick={onClose}>
-          <XIcon size={19} aria-hidden="true" />
-        </button>
-      </header>
-
+    <Modal
+      open={open}
+      onClose={onClose}
+      eyebrow="Controle de acesso"
+      title="Cadastrar profissional"
+      description="O perfil define as permissões funcionais dentro do PAD."
+      icon={<UserPlusIcon size={22} weight="duotone" />}
+      dismissible={!mutation.isPending}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={mutation.isPending}
+            onClick={onClose}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="user-create-form"
+            loading={mutation.isPending}
+            icon={<UserPlusIcon size={17} />}
+          >
+            Cadastrar usuário
+          </Button>
+        </>
+      }
+    >
       <form
-        className="user-create-form"
+        className="user-form"
+        id="user-create-form"
         onSubmit={handleSubmit((values) => mutation.mutate(values))}
       >
         <FormField
@@ -74,38 +106,49 @@ export function UserCreatePanel({ onClose }: UserCreatePanelProps) {
           label="Senha temporária"
           type="password"
           autoComplete="new-password"
+          hint="O profissional deve trocá-la no primeiro acesso."
           error={errors.senha?.message}
           {...register('senha')}
         />
-        <label className="select-field">
-          <span>Perfil e permissões</span>
-          <select {...register('papel')}>
-            <option value="ENFERMEIRO">Enfermagem — triagem e encaminhamento</option>
-            <option value="MEDICO">Medicina — prontuário e prescrição</option>
-            <option value="ADMIN">Administração — usuários e acessos</option>
-          </select>
-        </label>
+
+        <Controller
+          control={control}
+          name="papel"
+          render={({ field }) => (
+            <Select
+              label="Perfil e permissões"
+              value={field.value}
+              options={roleOptions}
+              onChange={field.onChange}
+            />
+          )}
+        />
+
+        {/* Pré-visualização: o admin vê o efeito da escolha antes de salvar,
+            em vez de descobrir pelo chamado de suporte. */}
+        <div className="permission-preview">
+          <strong>O que este perfil poderá fazer</strong>
+          <ul>
+            {rolePermissions[selectedRole].map((permission) => (
+              <li
+                className={permission.allowed ? '' : 'is-denied'}
+                key={permission.text}
+              >
+                {permission.allowed ? (
+                  <CheckIcon size={14} weight="bold" aria-hidden="true" />
+                ) : (
+                  <ProhibitIcon size={14} weight="bold" aria-hidden="true" />
+                )}
+                {permission.text}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {mutation.isError ? (
-          <div className="form-alert" role="alert">
-            <WarningCircleIcon size={18} />
-            {getApiErrorMessage(mutation.error)}
-          </div>
+          <Alert tone="error">{getApiErrorMessage(mutation.error)}</Alert>
         ) : null}
-
-        <div className="user-create-form__actions">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            loading={mutation.isPending}
-            icon={<UserPlusIcon size={18} />}
-          >
-            Cadastrar usuário
-          </Button>
-        </div>
       </form>
-    </section>
+    </Modal>
   )
 }

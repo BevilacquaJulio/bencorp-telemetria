@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ToastProvider } from '../../../components/ui/ToastProvider'
 import {
   createUser,
   listUsers,
@@ -47,9 +48,35 @@ function renderUsers() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <UsersPage />
+      <ToastProvider>
+        <UsersPage />
+      </ToastProvider>
     </QueryClientProvider>,
   )
+}
+
+/**
+ * Abre o dropdown customizado e escolhe uma opção.
+ *
+ * Existe porque `userEvent.selectOptions` só funciona com `<select>` nativo.
+ * O `Select` do PAD é um combobox ARIA (botão + listbox), e o teste imita o
+ * que a pessoa faz: clica no gatilho, clica na opção.
+ */
+async function chooseOption(
+  user: ReturnType<typeof userEvent.setup>,
+  comboboxName: string | RegExp,
+  optionName: string | RegExp,
+) {
+  // A página renderiza tabela e cards ao mesmo tempo (o CSS decide qual
+  // aparece), então o mesmo controle existe duas vezes no DOM. O teste usa a
+  // primeira ocorrência — a da tabela.
+  const [combobox] = await screen.findAllByRole('combobox', {
+    name: comboboxName,
+  })
+  await user.click(combobox)
+
+  const [option] = await screen.findAllByRole('option', { name: optionName })
+  await user.click(option)
 }
 
 describe('UsersPage', () => {
@@ -60,18 +87,69 @@ describe('UsersPage', () => {
     mockedUpdateUserRole.mockReset()
   })
 
-  it('permite alterar o perfil e suas permissões funcionais', async () => {
+  it('exige confirmação antes de alterar o perfil de um profissional', async () => {
     const user = userEvent.setup()
     mockedUpdateUserRole.mockResolvedValue({ ...nurse, papel: 'MEDICO' })
     renderUsers()
 
-    const roleControls = await screen.findAllByLabelText('Perfil de Ana Ferreira')
-    await user.selectOptions(roleControls[0], 'MEDICO')
+    await screen.findAllByText('Ana Ferreira')
+    await chooseOption(user, 'Perfil de Ana Ferreira', /Medicina/)
+
+    // Escolher no dropdown não muda nada sozinho: trocar de papel é
+    // escalação de privilégio e passa por confirmação explícita.
+    expect(mockedUpdateUserRole).not.toHaveBeenCalled()
+    expect(
+      await screen.findByRole('dialog', {
+        name: 'Alterar o perfil de Ana Ferreira?',
+      }),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Alterar perfil' }))
 
     expect(mockedUpdateUserRole).toHaveBeenCalledWith(
       { id: nurse.id, papel: 'MEDICO' },
       expect.anything(),
     )
+  })
+
+  it('cancela a troca de perfil sem chamar a API', async () => {
+    const user = userEvent.setup()
+    renderUsers()
+
+    await screen.findAllByText('Ana Ferreira')
+    await chooseOption(user, 'Perfil de Ana Ferreira', /Administração/)
+    await user.click(
+      await screen.findByRole('button', { name: 'Manter perfil atual' }),
+    )
+
+    expect(mockedUpdateUserRole).not.toHaveBeenCalled()
+  })
+
+  it('exige confirmação antes de desativar um acesso', async () => {
+    const user = userEvent.setup()
+    mockedSetUserActive.mockResolvedValue({ ...nurse, ativo: false })
+    renderUsers()
+
+    const deactivateButtons = await screen.findAllByRole('button', {
+      name: 'Desativar',
+    })
+    await user.click(deactivateButtons[0])
+
+    expect(mockedSetUserActive).not.toHaveBeenCalled()
+    expect(
+      await screen.findByRole('dialog', {
+        name: 'Desativar o acesso de Ana Ferreira?',
+      }),
+    ).toBeInTheDocument()
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Desativar o acesso de Ana Ferreira?',
+    })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Desativar acesso' }),
+    )
+
+    expect(mockedSetUserActive).toHaveBeenCalledWith(nurse, expect.anything())
   })
 
   it('cadastra um novo usuário com o perfil selecionado', async () => {
@@ -92,10 +170,7 @@ describe('UsersPage', () => {
       'carlos@pad.local',
     )
     await user.type(screen.getByLabelText('Senha temporária'), 'Senha@123')
-    await user.selectOptions(
-      screen.getByLabelText('Perfil e permissões'),
-      'MEDICO',
-    )
+    await chooseOption(user, 'Perfil e permissões', /Medicina/)
     await user.click(screen.getByRole('button', { name: 'Cadastrar usuário' }))
 
     expect(mockedCreateUser).toHaveBeenCalledWith(

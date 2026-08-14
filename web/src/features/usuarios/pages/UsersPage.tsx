@@ -1,63 +1,84 @@
 import {
-  MagnifyingGlassIcon,
   PlusIcon,
-  ProhibitIcon,
   ShieldCheckIcon,
   UserGearIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useState } from 'react'
+import { Alert } from '../../../components/ui/Alert'
+import { Avatar } from '../../../components/ui/Avatar'
 import { Button } from '../../../components/ui/Button'
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import {
   EmptyState,
   ErrorState,
   TableSkeleton,
 } from '../../../components/ui/DataState'
+import { Pagination } from '../../../components/ui/Pagination'
+import { SearchInput } from '../../../components/ui/SearchInput'
+import { Select } from '../../../components/ui/Select'
+import { useToast } from '../../../components/ui/toast-context'
 import { getApiErrorMessage } from '../../../lib/api'
-import { formatDate, initials } from '../../../lib/format'
+import { formatDate } from '../../../lib/format'
 import type { Papel } from '../../auth/auth.types'
 import { UserCreatePanel } from '../components/UserCreatePanel'
 import { UserRoleControl } from '../components/UserRoleControl'
+import { roleFilterOptions } from '../role-options'
 import { listUsers, setUserActive } from '../usuarios.api'
+import type { UserListItem } from '../usuarios.types'
 
 export function UsersPage() {
   const queryClient = useQueryClient()
+  const { notify } = useToast()
+
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
   const [role, setRole] = useState<Papel | ''>('')
   const [page, setPage] = useState(1)
   const [creatingUser, setCreatingUser] = useState(false)
+  const [togglingUser, setTogglingUser] = useState<UserListItem | null>(null)
+
   const users = useQuery({
     queryKey: ['users', deferredSearch, role, page],
     queryFn: () => listUsers(deferredSearch, role, page),
   })
+
   const activeMutation = useMutation({
     mutationFn: setUserActive,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['users'] })
+      setTogglingUser(null)
+      notify({
+        tone: 'success',
+        title: variables.ativo ? 'Acesso desativado' : 'Acesso reativado',
+        description: `${variables.nome} — alteração registrada.`,
+      })
+    },
   })
 
-  const activeCount = users.data?.itens.filter((user) => user.ativo).length ?? 0
-  const clinicalCount =
-    users.data?.itens.filter((user) => user.papel !== 'ADMIN').length ?? 0
+  const items = users.data?.itens ?? []
+  const activeCount = items.filter((user) => user.ativo).length
+  const clinicalCount = items.filter((user) => user.papel !== 'ADMIN').length
 
   return (
     <div className="page-stack">
       <header className="page-heading page-enter">
         <div>
-          <p className="page-heading__context">Administração</p>
+          <p className="page-heading__eyebrow">Administração</p>
           <h1>Usuários e acessos</h1>
-          <p>Gerencie perfis profissionais sem acessar informações clínicas.</p>
+          <p className="page-heading__lead">
+            Gerencie perfis profissionais sem acessar informações clínicas.
+          </p>
         </div>
         <div className="page-heading__actions">
-          <div className="page-heading__date">
-            <ShieldCheckIcon size={18} />
+          <span className="tag">
+            <ShieldCheckIcon size={14} aria-hidden="true" />
             Gestão de acesso restrita
-          </div>
+          </span>
           <Button
             type="button"
-            size="sm"
-            icon={<PlusIcon size={17} />}
+            icon={<PlusIcon size={16} weight="bold" />}
             onClick={() => setCreatingUser(true)}
           >
             Novo usuário
@@ -65,96 +86,83 @@ export function UsersPage() {
         </div>
       </header>
 
-      {creatingUser ? (
-        <UserCreatePanel onClose={() => setCreatingUser(false)} />
-      ) : null}
-
       <section className="admin-summary page-enter page-enter--1">
-        <div>
-          <span className="admin-summary__icon">
-            <UsersThreeIcon size={25} weight="duotone" />
+        <article className="admin-stat">
+          <span className="admin-stat__icon" aria-hidden="true">
+            <UsersThreeIcon size={22} weight="duotone" />
           </span>
-          <p>
+          <div className="admin-stat__text">
             <strong>{users.data?.total ?? 0}</strong>
-            usuários cadastrados
-          </p>
-        </div>
-        <div>
-          <span className="admin-summary__icon">
-            <ShieldCheckIcon size={25} weight="duotone" />
+            <span>usuários cadastrados</span>
+          </div>
+        </article>
+        <article className="admin-stat">
+          <span className="admin-stat__icon" aria-hidden="true">
+            <ShieldCheckIcon size={22} weight="duotone" />
           </span>
-          <p>
+          <div className="admin-stat__text">
             <strong>{activeCount}</strong>
-            ativos nesta página
-          </p>
-        </div>
-        <div>
-          <span className="admin-summary__icon">
-            <UserGearIcon size={25} weight="duotone" />
+            <span>ativos nesta página</span>
+          </div>
+        </article>
+        <article className="admin-stat">
+          <span className="admin-stat__icon" aria-hidden="true">
+            <UserGearIcon size={22} weight="duotone" />
           </span>
-          <p>
+          <div className="admin-stat__text">
             <strong>{clinicalCount}</strong>
-            profissionais clínicos
-          </p>
-        </div>
+            <span>profissionais clínicos nesta página</span>
+          </div>
+        </article>
       </section>
 
       <section className="panel users-panel page-enter page-enter--2">
-        <div className="filter-bar">
-          <div className="search-control">
-            <MagnifyingGlassIcon size={19} aria-hidden="true" />
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                setPage(1)
-              }}
-              placeholder="Buscar por nome ou e-mail"
-              aria-label="Buscar usuário"
-            />
-          </div>
-          <label className="single-select">
-            <span className="sr-only">Filtrar por perfil</span>
-            <select
-              value={role}
-              onChange={(event) => {
-                setRole(event.target.value as Papel | '')
-                setPage(1)
-              }}
-            >
-              <option value="">Todos os perfis</option>
-              <option value="ADMIN">Administradores</option>
-              <option value="ENFERMEIRO">Enfermagem</option>
-              <option value="MEDICO">Medicina</option>
-            </select>
-          </label>
+        <div className="toolbar">
+          <SearchInput
+            label="Buscar usuário"
+            placeholder="Buscar por nome ou e-mail"
+            value={search}
+            onChange={(value) => {
+              setSearch(value)
+              setPage(1)
+            }}
+          />
+          <Select
+            label="Filtrar por perfil"
+            hideLabel
+            size="sm"
+            value={role}
+            options={roleFilterOptions}
+            onChange={(value) => {
+              setRole(value)
+              setPage(1)
+            }}
+          />
         </div>
 
-        {activeMutation.isError ? (
-          <div className="inline-alert" role="alert">
-            <ProhibitIcon size={19} />
-            {getApiErrorMessage(activeMutation.error)}
+        {users.isLoading ? (
+          <div className="panel__body">
+            <TableSkeleton rows={6} />
           </div>
         ) : null}
 
-        {users.isLoading ? <TableSkeleton rows={6} /> : null}
         {users.isError ? (
           <ErrorState
             message={getApiErrorMessage(users.error)}
             onRetry={() => void users.refetch()}
           />
         ) : null}
-        {users.isSuccess && users.data.itens.length === 0 ? (
+
+        {users.isSuccess && items.length === 0 ? (
           <EmptyState
             title="Nenhum usuário encontrado"
             description="Ajuste os filtros para consultar outros perfis."
           />
         ) : null}
 
-        {users.isSuccess && users.data.itens.length > 0 ? (
+        {users.isSuccess && items.length > 0 ? (
           <>
-            <div className="desktop-table">
+            <div className="data-table">
               <table>
                 <thead>
                   <tr>
@@ -166,15 +174,15 @@ export function UsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.data.itens.map((user) => (
+                  {items.map((user) => (
                     <tr key={user.id}>
                       <td>
-                        <div className="user-cell">
-                          <span>{initials(user.nome)}</span>
-                          <div>
+                        <div className="identity-cell">
+                          <Avatar name={user.nome} size="sm" />
+                          <span className="identity-cell__text">
                             <strong>{user.nome}</strong>
                             <small>{user.email}</small>
-                          </div>
+                          </span>
                         </div>
                       </td>
                       <td>
@@ -191,13 +199,9 @@ export function UsersPage() {
                       <td>
                         <Button
                           type="button"
-                          variant={user.ativo ? 'ghost' : 'secondary'}
+                          variant={user.ativo ? 'danger-ghost' : 'secondary'}
                           size="sm"
-                          loading={
-                            activeMutation.isPending &&
-                            activeMutation.variables?.id === user.id
-                          }
-                          onClick={() => activeMutation.mutate(user)}
+                          onClick={() => setTogglingUser(user)}
                         >
                           {user.ativo ? 'Desativar' : 'Ativar'}
                         </Button>
@@ -208,15 +212,15 @@ export function UsersPage() {
               </table>
             </div>
 
-            <div className="mobile-list">
-              {users.data.itens.map((user) => (
+            <div className="user-cards">
+              {items.map((user) => (
                 <article className="user-card" key={user.id}>
-                  <div className="user-cell">
-                    <span>{initials(user.nome)}</span>
-                    <div>
+                  <div className="identity-cell">
+                    <Avatar name={user.nome} />
+                    <span className="identity-cell__text">
                       <strong>{user.nome}</strong>
                       <small>{user.email}</small>
-                    </div>
+                    </span>
                   </div>
                   <div className="user-card__meta">
                     <UserRoleControl user={user} />
@@ -228,13 +232,10 @@ export function UsersPage() {
                   </div>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant={user.ativo ? 'danger-ghost' : 'secondary'}
                     size="sm"
-                    loading={
-                      activeMutation.isPending &&
-                      activeMutation.variables?.id === user.id
-                    }
-                    onClick={() => activeMutation.mutate(user)}
+                    block
+                    onClick={() => setTogglingUser(user)}
                   >
                     {user.ativo ? 'Desativar acesso' : 'Ativar acesso'}
                   </Button>
@@ -242,34 +243,64 @@ export function UsersPage() {
               ))}
             </div>
 
-            <footer className="panel-pagination">
-              <span>
-                Página {users.data.pagina} de {Math.max(users.data.paginas, 1)}
-              </span>
-              <div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((current) => current - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={page >= users.data.paginas}
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  Próxima
-                </Button>
-              </div>
-            </footer>
+            <Pagination
+              page={users.data.pagina}
+              totalPages={users.data.paginas}
+              totalItems={users.data.total}
+              itemLabel="usuários"
+              onChange={setPage}
+            />
           </>
         ) : null}
       </section>
+
+      <UserCreatePanel
+        open={creatingUser}
+        onClose={() => setCreatingUser(false)}
+      />
+
+      {/*
+        Desativar acesso é a ação mais destrutiva desta tela: derruba um
+        profissional no meio do turno. As consequências abaixo são específicas
+        de propósito — "esta ação não pode ser desfeita" seria falso (dá para
+        reativar) e treinaria o admin a clicar sem ler.
+      */}
+      <ConfirmDialog
+        open={togglingUser !== null}
+        eyebrow="Controle de acesso"
+        title={
+          togglingUser?.ativo
+            ? `Desativar o acesso de ${togglingUser.nome}?`
+            : `Reativar o acesso de ${togglingUser?.nome ?? ''}?`
+        }
+        description={
+          togglingUser?.ativo
+            ? 'O profissional perde o acesso ao PAD imediatamente.'
+            : 'O profissional volta a acessar o PAD com o perfil atual.'
+        }
+        consequences={
+          togglingUser?.ativo
+            ? [
+                'Novos logins passam a ser recusados.',
+                'Atendimentos em andamento vinculados a esta pessoa continuam abertos e precisarão ser tratados.',
+                'O acesso pode ser reativado depois, sem novo cadastro.',
+              ]
+            : ['O profissional volta a aparecer como disponível para atender.']
+        }
+        confirmLabel={togglingUser?.ativo ? 'Desativar acesso' : 'Reativar acesso'}
+        cancelLabel="Cancelar"
+        tone={togglingUser?.ativo ? 'danger' : 'default'}
+        loading={activeMutation.isPending}
+        error={
+          activeMutation.isError ? (
+            <Alert tone="error" compact>
+              {getApiErrorMessage(activeMutation.error)}
+            </Alert>
+          ) : null
+        }
+        onConfirm={() => togglingUser && activeMutation.mutate(togglingUser)}
+        onCancel={() => setTogglingUser(null)}
+      />
     </div>
   )
 }
