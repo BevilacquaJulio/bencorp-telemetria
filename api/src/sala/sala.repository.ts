@@ -135,6 +135,61 @@ export class SalaRepository {
     });
   }
 
+  async buscarContextoDoAcessoPaciente(
+    tokenHash: string,
+    atendimentoId: string,
+    agora: Date,
+  ) {
+    return this.prisma.salaToken.findFirst({
+      where: {
+        tokenHash,
+        atendimentoId,
+        participante: Participante.PACIENTE,
+        tipo: TipoTokenSala.ACESSO_LIVEKIT,
+        revogadoEm: null,
+        expiraEm: { gt: agora },
+        atendimento: { status: StatusAtendimento.EM_ANDAMENTO },
+      },
+      select: {
+        atendimento: {
+          select: {
+            paciente: { select: { nome: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async renovarAcessoPaciente(
+    tokenHashAtual: string,
+    dados: RegistrarTokenSala,
+    agora: Date,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      if (!(await this.bloquearAtendimentoAtivo(tx, dados.atendimentoId))) {
+        return false;
+      }
+
+      const { count } = await tx.salaToken.updateMany({
+        where: {
+          tokenHash: tokenHashAtual,
+          atendimentoId: dados.atendimentoId,
+          participante: Participante.PACIENTE,
+          tipo: TipoTokenSala.ACESSO_LIVEKIT,
+          revogadoEm: null,
+          expiraEm: { gt: agora },
+        },
+        data: { revogadoEm: agora },
+      });
+      if (count === 0) {
+        return false;
+      }
+
+      await tx.salaToken.create({ data: dados });
+      return true;
+    });
+  }
+
   async profissionalDoAtendimento(
     atendimentoId: string,
   ): Promise<string | null> {

@@ -279,6 +279,47 @@ describe('Sala e tokens de vídeo (e2e)', () => {
     expect(respostas.filter(({ status }) => status === 403)).toHaveLength(1);
   });
 
+  it('renova o acesso do paciente em até 15 minutos e invalida o anterior', async () => {
+    const link = await criarLink();
+    const entrada = await request(app.getHttpServer())
+      .post(`/sala/${link}/entrar`)
+      .send({ atendimentoId });
+    expect(entrada.status).toBe(200);
+    const tokenAtual = (entrada.body as { token: string }).token;
+
+    const renovacao = await request(app.getHttpServer())
+      .post(`/sala/${atendimentoId}/renovar`)
+      .send({ token: tokenAtual });
+    expect(renovacao.status).toBe(200);
+    const renovado = renovacao.body as { token: string; expiraEm: string };
+    expect(renovado.token).not.toBe(tokenAtual);
+    expect(
+      new Date(renovado.expiraEm).getTime() - Date.now(),
+    ).toBeLessThanOrEqual(900_000);
+
+    const [anteriorPersistido, novoPersistido] = await Promise.all([
+      prisma.salaToken.findUnique({
+        where: { tokenHash: hash(tokenAtual) },
+        select: { revogadoEm: true },
+      }),
+      prisma.salaToken.findUnique({
+        where: { tokenHash: hash(renovado.token) },
+        select: { revogadoEm: true, participante: true, tipo: true },
+      }),
+    ]);
+    expect(anteriorPersistido?.revogadoEm).not.toBeNull();
+    expect(novoPersistido).toMatchObject({
+      revogadoEm: null,
+      participante: Participante.PACIENTE,
+      tipo: TipoTokenSala.ACESSO_LIVEKIT,
+    });
+
+    const reutilizacao = await request(app.getHttpServer())
+      .post(`/sala/${atendimentoId}/renovar`)
+      .send({ token: tokenAtual });
+    expect(reutilizacao.status).toBe(403);
+  });
+
   it('recusa link expirado sem revelar o motivo', async () => {
     const token = await criarLink();
     await prisma.salaToken.update({

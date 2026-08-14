@@ -27,6 +27,8 @@ import {
   entrarSalaPacienteSchema,
   tokenOpacoSchema,
 } from './dto/entrar-sala-paciente.schema';
+import type { RenovarSalaPacienteDto } from './dto/renovar-sala-paciente.schema';
+import { renovarSalaPacienteSchema } from './dto/renovar-sala-paciente.schema';
 import { SalaService } from './sala.service';
 
 @ApiTags('sala')
@@ -114,5 +116,30 @@ export class SalaController {
     dto: EntrarSalaPacienteDto,
   ) {
     return this.service.entrarComoPaciente(token, dto);
+  }
+
+  @Post('sala/:atendimentoId/renovar')
+  @Publico()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @Auditavel({
+    acao: 'SALA_TOKEN_RENOVACAO_PACIENTE',
+    recurso: 'atendimento',
+    param: 'atendimentoId',
+  })
+  @ApiOperation({
+    summary: 'Renova o acesso LiveKit atual do paciente',
+  })
+  @ApiResponse({ status: 200, description: 'Token LiveKit renovado' })
+  @ApiResponse({
+    status: 403,
+    description: 'Credencial inválida, expirada, revogada ou já renovada',
+  })
+  renovarPaciente(
+    @Param('atendimentoId', ParseUUIDPipe) atendimentoId: string,
+    @Body(new ZodValidationPipe(renovarSalaPacienteSchema))
+    dto: RenovarSalaPacienteDto,
+  ) {
+    return this.service.renovarTokenPaciente(atendimentoId, dto.token);
   }
 }

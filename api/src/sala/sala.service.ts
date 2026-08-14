@@ -12,6 +12,7 @@ import { SalaRepository } from './sala.repository';
 export class SalaService {
   private readonly logger = new Logger(SalaService.name);
   private readonly ttlSegundos: number;
+  private readonly atrasosDeEncerramentoMs = [100, 250];
 
   constructor(
     private readonly repo: SalaRepository,
@@ -108,19 +109,77 @@ export class SalaService {
     );
   }
 
+  async renovarTokenPaciente(atendimentoId: string, tokenAtual: string) {
+    const agora = new Date();
+    const tokenHashAtual = this.hash(tokenAtual);
+    const contexto = await this.repo.buscarContextoDoAcessoPaciente(
+      tokenHashAtual,
+      atendimentoId,
+      agora,
+    );
+    if (!contexto) {
+      this.acessoPacienteInvalido();
+    }
+
+    const novoToken = await this.livekit.emitirToken({
+      atendimentoId,
+      identidade: this.livekit.identidadeDoPaciente(atendimentoId),
+      nome: contexto.atendimento.paciente.nome,
+      participante: Participante.PACIENTE,
+      ttlSegundos: this.ttlSegundos,
+    });
+    const expiraEm = this.novaExpiracao();
+    const renovado = await this.repo.renovarAcessoPaciente(
+      tokenHashAtual,
+      {
+        atendimentoId,
+        tokenHash: this.hash(novoToken),
+        participante: Participante.PACIENTE,
+        tipo: TipoTokenSala.ACESSO_LIVEKIT,
+        usuarioId: null,
+        expiraEm,
+      },
+      agora,
+    );
+    if (!renovado) {
+      this.acessoPacienteInvalido();
+    }
+
+    return this.respostaDeAcesso(
+      novoToken,
+      atendimentoId,
+      Participante.PACIENTE,
+      expiraEm,
+    );
+  }
+
   async encerrar(atendimentoId: string): Promise<void> {
     const profissionalId =
       await this.repo.profissionalDoAtendimento(atendimentoId);
-    try {
-      await this.livekit.encerrarSala(atendimentoId, profissionalId);
-    } catch (erro) {
-      // O banco já revogou as credenciais na mesma transação que finalizou o
-      // atendimento. Falha transitória do provedor não pode desfazer o estado
-      // clínico; fica explícita no log para retentativa operacional.
-      this.logger.error(
-        `Falha ao encerrar sala do atendimento ${atendimentoId}`,
-        erro instanceof Error ? erro.stack : String(erro),
-      );
+    const totalDeTentativas = this.atrasosDeEncerramentoMs.length + 1;
+
+    for (let tentativa = 1; tentativa <= totalDeTentativas; tentativa += 1) {
+      try {
+        await this.livekit.encerrarSala(atendimentoId, profissionalId);
+        return;
+      } catch (erro) {
+        if (tentativa === totalDeTentativas) {
+          // O banco já revogou as credenciais na transação que finalizou o
+          // atendimento. A falha do provedor não pode desfazer o estado
+          // clínico, mas fica explícita depois das retentativas curtas.
+          this.logger.error(
+            `Falha ao encerrar sala do atendimento ${atendimentoId} após ${totalDeTentativas} tentativas`,
+            erro instanceof Error ? erro.stack : String(erro),
+          );
+          return;
+        }
+
+        const atraso = this.atrasosDeEncerramentoMs[tentativa - 1] ?? 0;
+        this.logger.warn(
+          `LiveKit indisponível ao encerrar ${atendimentoId}; nova tentativa em ${atraso}ms`,
+        );
+        await this.aguardar(atraso);
+      }
     }
   }
 
@@ -180,6 +239,10 @@ export class SalaService {
     return createHash('sha256').update(token).digest('hex');
   }
 
+  private aguardar(milisegundos: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milisegundos));
+  }
+
   private salaIndisponivel(): never {
     throw new TransicaoInvalida(
       'A sala só pode ser acessada durante um atendimento em andamento',
@@ -190,5 +253,11 @@ export class SalaService {
     // A mesma resposta cobre token errado, expirado, revogado, reutilizado e
     // pertencente a outro atendimento. Diferenciar os casos criaria oráculo.
     throw new AcessoNegado('Link de acesso inválido ou expirado');
+  }
+
+  private acessoPacienteInvalido(): never {
+    // Token errado, expirado, revogado, já renovado e atendimento encerrado
+    // produzem a mesma resposta para não revelar o estado da sala.
+    throw new AcessoNegado('Acesso da sala inválido ou expirado');
   }
 }

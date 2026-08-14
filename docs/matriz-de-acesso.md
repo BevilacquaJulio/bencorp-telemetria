@@ -41,6 +41,7 @@ A matriz foi escrita antes das rotas, de propósito: preencher célula a célula
 | 27 | `GET /atendimentos/:id` — ainda `AGUARDANDO`, sem profissional | 200 | 200 | **403** | 401 |
 | 28 | `POST /atendimentos/:id/sala/link-paciente` — vinculado | 201 | 201 | **403** | 401 |
 | 29 | `POST /atendimentos/cadastrar-paciente` | 201 | **403** | **403** | 401 |
+| 30 | `POST /sala/:atendimentoId/renovar` — token atual do paciente | — | — | — | **200** |
 
 ## Decisões que a matriz registra
 
@@ -53,6 +54,8 @@ A matriz foi escrita antes das rotas, de propósito: preencher célula a célula
 **Atendimento sem profissional é visível para os papéis clínicos (linha 27).** Enquanto está `AGUARDANDO`, ninguém está vinculado — exigir vínculo tornaria impossível abrir o primeiro atendimento da fila para então assumi-lo. A permissão dura só até alguém assumir: a partir daí valem as linhas 25 e 26. A regra é do `EscopoGuard`, e as rotas que não podem admiti-la (prontuário) declaram `permitirSemVinculo: false`.
 
 **Cadastro e entrada na fila formam uma única operação (linha 29).** A enfermagem informa os dados da nova pessoa e o sistema cria um atendimento em `AGUARDANDO`, sem profissional vinculado e sem iniciar a triagem. Se o CPF já existir, a transação inteira falha e nenhum cadastro parcial permanece.
+
+**O paciente renova a própria sessão, não o convite (linha 30).** O link opaco continua sendo de uso único. Depois da troca, o token LiveKit atual funciona como credencial de renovação: o backend confere somente seu hash, exige atendimento em andamento, revoga a credencial anterior de forma atômica e emite outra com TTL de no máximo 15 minutos. Token errado, expirado, revogado ou já renovado recebe a mesma resposta `403`.
 
 **Identificador inexistente ou malformado responde `403`, nunca `404`.** Distinguir "não existe" de "não é seu" transformaria a rota num oráculo de existência: bastaria varrer identificadores e separar as respostas para descobrir quantos atendimentos o sistema tem.
 
