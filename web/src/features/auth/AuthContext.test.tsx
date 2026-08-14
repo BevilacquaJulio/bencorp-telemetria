@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { AuthProvider } from './AuthContext'
 import { useAuth } from './auth-context'
-import type { AuthSession } from '../auth.types'
+import type { AuthSession } from './auth.types'
 
 const ana: AuthSession = {
   token: 'token-ana',
