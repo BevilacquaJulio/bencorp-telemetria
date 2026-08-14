@@ -8,13 +8,12 @@ import {
 
 const TODOS = Object.values(StatusAtendimento);
 
-// As únicas quatro transições que existem no sistema. Tudo o que não estiver
+// As únicas três transições que existem no sistema. Tudo o que não estiver
 // nesta lista precisa ser recusado — inclusive um estado para ele mesmo.
 const PERMITIDAS: [StatusAtendimento, StatusAtendimento][] = [
   [StatusAtendimento.AGUARDANDO, StatusAtendimento.EM_ANDAMENTO],
   [StatusAtendimento.AGUARDANDO, StatusAtendimento.CANCELADO],
   [StatusAtendimento.EM_ANDAMENTO, StatusAtendimento.FINALIZADO],
-  [StatusAtendimento.EM_ANDAMENTO, StatusAtendimento.CANCELADO],
 ];
 
 const ehPermitida = (de: StatusAtendimento, para: StatusAtendimento) =>
@@ -68,6 +67,15 @@ describe('máquina de estados do atendimento', () => {
         transicaoPermitida(
           StatusAtendimento.CANCELADO,
           StatusAtendimento.AGUARDANDO,
+        ),
+      ).toBe(false);
+    });
+
+    it('EM_ANDAMENTO não pode ser cancelado', () => {
+      expect(
+        transicaoPermitida(
+          StatusAtendimento.EM_ANDAMENTO,
+          StatusAtendimento.CANCELADO,
         ),
       ).toBe(false);
     });

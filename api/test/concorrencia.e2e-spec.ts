@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { Papel } from '../generated/prisma/client';
@@ -23,8 +24,9 @@ import { PrismaService } from '../src/common/prisma/prisma.service';
 const SENHA = 'Senha@123';
 const TENTATIVAS = 10;
 
-// Atendimento AGUARDANDO, já triado com risco VERMELHO. Ver prisma/seed.ts.
-const ALVO = 'c0000000-0000-4000-8000-000000000003';
+// Paciente conhecido do seed. Cada teste cria seu próprio atendimento para não
+// precisar executar uma transição proibida só para restaurar o estado.
+const CPF_PACIENTE = '10000000003';
 
 // Profissionais só deste arquivo. Os quatro clínicos do seed já têm
 // EM_ANDAMENTO (o índice único parcial), então usá-los faria todo iniciar
@@ -39,6 +41,9 @@ const CONCORRENTES = [
 describe('Concorrência ao assumir atendimento (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let pacienteId: string;
+  let alvo: string;
+  const atendimentosCriados = new Set<string>();
   const tokens: string[] = [];
 
   const logar = async (email: string): Promise<string> => {
@@ -48,6 +53,38 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
 
     expect(r.status).toBe(200);
     return (r.body as { token: string }).token;
+  };
+
+  const finalizarAtivosDosConcorrentes = async (): Promise<void> => {
+    const ativos = await prisma.atendimento.findMany({
+      where: {
+        status: 'EM_ANDAMENTO',
+        profissional: { email: { in: [...CONCORRENTES] } },
+      },
+      select: { id: true },
+    });
+    if (ativos.length === 0) {
+      return;
+    }
+
+    const ids = ativos.map(({ id }) => id);
+    const agora = new Date();
+    await prisma.$transaction(async (tx) => {
+      // Preserva o histórico entre execuções do teste. DELETE não só perderia
+      // triagem como violaria as FKs/auditoria append-only do domínio.
+      await tx.atendimento.updateMany({
+        where: { id: { in: ids }, status: 'EM_ANDAMENTO' },
+        data: { status: 'FINALIZADO', finalizadoEm: agora },
+      });
+      await tx.prontuario.updateMany({
+        where: { atendimentoId: { in: ids }, finalizadoEm: null },
+        data: { finalizadoEm: agora },
+      });
+      await tx.salaToken.updateMany({
+        where: { atendimentoId: { in: ids }, revogadoEm: null },
+        data: { revogadoEm: agora },
+      });
+    });
   };
 
   beforeAll(async () => {
@@ -60,6 +97,14 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    const paciente = await prisma.paciente.findUnique({
+      where: { cpf: CPF_PACIENTE },
+      select: { id: true },
+    });
+    if (!paciente) {
+      throw new Error(`Paciente de teste ${CPF_PACIENTE} não encontrado`);
+    }
+    pacienteId = paciente.id;
 
     const senhaHash = await bcrypt.hash(SENHA, 10);
     for (const email of CONCORRENTES) {
@@ -78,30 +123,36 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
   });
 
   beforeEach(async () => {
-    // Devolve o alvo para a fila. O teste precisa partir sempre do mesmo
-    // estado, e rodar a suíte duas vezes seguidas não pode mudar o resultado.
-    await prisma.atendimento.update({
-      where: { id: ALVO },
-      data: {
-        status: 'AGUARDANDO',
-        profissionalId: null,
-        iniciadoEm: null,
-      },
-    });
+    // Com a máquina de estados protegida também no banco, voltar de
+    // EM_ANDAMENTO para AGUARDANDO seria uma violação real. Um alvo novo por
+    // teste mantém o isolamento sem criar uma porta dos fundos no domínio.
+    await finalizarAtivosDosConcorrentes();
 
-    // Solta só os concorrentes deste arquivo. Não mexe nos EM_ANDAMENTO do
-    // seed (Carla, Diego…): a matriz de autorização roda em paralelo e
-    // depende deles continuarem vinculados.
-    await prisma.atendimento.updateMany({
-      where: {
-        status: 'EM_ANDAMENTO',
-        profissional: { email: { in: [...CONCORRENTES] } },
+    alvo = randomUUID();
+    atendimentosCriados.add(alvo);
+    await prisma.atendimento.create({
+      data: {
+        id: alvo,
+        pacienteId,
+        status: 'AGUARDANDO',
+        risco: 'VERMELHO',
       },
-      data: { status: 'AGUARDANDO', profissionalId: null, iniciadoEm: null },
     });
   });
 
   afterAll(async () => {
+    if (prisma) {
+      await finalizarAtivosDosConcorrentes();
+      if (atendimentosCriados.size > 0) {
+        await prisma.atendimento.updateMany({
+          where: {
+            id: { in: [...atendimentosCriados] },
+            status: 'AGUARDANDO',
+          },
+          data: { status: 'CANCELADO', canceladoEm: new Date() },
+        });
+      }
+    }
     await app?.close();
   });
 
@@ -111,7 +162,7 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
     const respostas = await Promise.all(
       Array.from({ length: TENTATIVAS }, (_, i) =>
         request(app.getHttpServer())
-          .post(`/atendimentos/${ALVO}/iniciar`)
+          .post(`/atendimentos/${alvo}/iniciar`)
           .set({ Authorization: `Bearer ${tokens[i % tokens.length]}` }),
       ),
     );
@@ -131,7 +182,7 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
     const respostas = await Promise.all(
       Array.from({ length: TENTATIVAS }, (_, i) =>
         request(app.getHttpServer())
-          .post(`/atendimentos/${ALVO}/iniciar`)
+          .post(`/atendimentos/${alvo}/iniciar`)
           .set({ Authorization: `Bearer ${tokens[i % tokens.length]}` }),
       ),
     );
@@ -140,7 +191,7 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
     expect(vencedora).toBeDefined();
 
     const gravado = await prisma.atendimento.findUnique({
-      where: { id: ALVO },
+      where: { id: alvo },
       select: { status: true, profissionalId: true, iniciadoEm: true },
     });
 
@@ -157,10 +208,10 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
   it('conflito responde com o código que explica o motivo', async () => {
     const [primeira, segunda] = await Promise.all([
       request(app.getHttpServer())
-        .post(`/atendimentos/${ALVO}/iniciar`)
+        .post(`/atendimentos/${alvo}/iniciar`)
         .set({ Authorization: `Bearer ${tokens[0]}` }),
       request(app.getHttpServer())
-        .post(`/atendimentos/${ALVO}/iniciar`)
+        .post(`/atendimentos/${alvo}/iniciar`)
         .set({ Authorization: `Bearer ${tokens[1]}` }),
     ]);
 
@@ -173,12 +224,12 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
 
   it('tentativa sequencial depois de assumido também é 409', async () => {
     const primeira = await request(app.getHttpServer())
-      .post(`/atendimentos/${ALVO}/iniciar`)
+      .post(`/atendimentos/${alvo}/iniciar`)
       .set({ Authorization: `Bearer ${tokens[0]}` });
     expect(primeira.status).toBe(201);
 
     const segunda = await request(app.getHttpServer())
-      .post(`/atendimentos/${ALVO}/iniciar`)
+      .post(`/atendimentos/${alvo}/iniciar`)
       .set({ Authorization: `Bearer ${tokens[1]}` });
 
     expect(segunda.status).toBe(409);
@@ -191,18 +242,22 @@ describe('Concorrência ao assumir atendimento (e2e)', () => {
     // Regra 2, garantida pelo índice único parcial. Primeiro assume o alvo,
     // depois tenta assumir um segundo atendimento que está na fila.
     const primeiro = await request(app.getHttpServer())
-      .post(`/atendimentos/${ALVO}/iniciar`)
+      .post(`/atendimentos/${alvo}/iniciar`)
       .set({ Authorization: `Bearer ${tokens[0]}` });
     expect(primeiro.status).toBe(201);
 
-    const outroDaFila = await prisma.atendimento.findFirst({
-      where: { status: 'AGUARDANDO', id: { not: ALVO } },
+    const outroDaFila = await prisma.atendimento.create({
+      data: {
+        id: randomUUID(),
+        pacienteId,
+        status: 'AGUARDANDO',
+      },
       select: { id: true },
     });
-    expect(outroDaFila).not.toBeNull();
+    atendimentosCriados.add(outroDaFila.id);
 
     const segundo = await request(app.getHttpServer())
-      .post(`/atendimentos/${outroDaFila?.id}/iniciar`)
+      .post(`/atendimentos/${outroDaFila.id}/iniciar`)
       .set({ Authorization: `Bearer ${tokens[0]}` });
 
     expect(segundo.status).toBe(409);

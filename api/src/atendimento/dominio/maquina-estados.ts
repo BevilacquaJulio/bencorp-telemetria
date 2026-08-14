@@ -19,10 +19,7 @@ const TRANSICOES: Record<StatusAtendimento, StatusAtendimento[]> = {
     StatusAtendimento.EM_ANDAMENTO,
     StatusAtendimento.CANCELADO,
   ],
-  [StatusAtendimento.EM_ANDAMENTO]: [
-    StatusAtendimento.FINALIZADO,
-    StatusAtendimento.CANCELADO,
-  ],
+  [StatusAtendimento.EM_ANDAMENTO]: [StatusAtendimento.FINALIZADO],
   // Estados terminais. Corrigir um atendimento finalizado não é voltar o
   // status: é adendo no prontuário, que preserva o registro original.
   [StatusAtendimento.FINALIZADO]: [],

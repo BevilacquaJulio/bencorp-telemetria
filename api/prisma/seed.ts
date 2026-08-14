@@ -566,7 +566,8 @@ const ATENDIMENTOS: AtendimentoSeed[] = [
     comAdendo: false,
   },
 
-  // CANCELADO (2) — um antes da triagem, um depois.
+  // CANCELADO (2) — ambos saíram da fila antes de qualquer profissional
+  // assumir. Pelo grafo do case, cancelamento depois da triagem não existe.
   {
     id: 'c0000000-0000-4000-8000-000000000014',
     pacienteIndex: 3,
@@ -589,9 +590,9 @@ const ATENDIMENTOS: AtendimentoSeed[] = [
     pacienteIndex: 4,
     status: StatusAtendimento.CANCELADO,
     entradaFilaHorasAtras: SEMANA_PASSADA + 4,
-    risco: Risco.VERDE,
-    triagemAutor: 'ana',
-    triagemHorasAtras: SEMANA_PASSADA + 3,
+    risco: null,
+    triagemAutor: null,
+    triagemHorasAtras: null,
     profissional: null,
     iniciadoEmHorasAtras: null,
     finalizadoEmHorasAtras: null,
